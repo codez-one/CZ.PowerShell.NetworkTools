@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {},
+	"extensions": {
+		"recommendations": [
+			// for the powershell scripts
+			"ms-vscode.powershell",
+			// for the jupiter notebook integration for powershell
+			"ms-dotnettools.dotnet-interactive-vscode",
+			// for good language in the docs
+			"streetsidesoftware.code-spell-checker",
+			// for well formatted documentation
+			"docsmsft.docs-authoring-pack"
+		]
+	}
+}
