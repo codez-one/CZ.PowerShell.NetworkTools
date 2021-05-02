@@ -4,8 +4,8 @@ function Test-ProxyConfiguration {
     param (
         # The target URL that you are trying to test.
         [Parameter(
-            Mandatory = $true, 
-            ValueFromPipeline = $true, 
+            Mandatory = $true,
+            ValueFromPipeline = $true,
             Position = 0,
             HelpMessage = "Enter the URL you are trying to test."
         )]
@@ -17,17 +17,17 @@ function Test-ProxyConfiguration {
         [System.Net.IWebProxy]
         $Proxy = [System.Net.WebRequest]::GetSystemWebProxy()
     )
-    
+
     begin {
         # set display properties for ProxyTestResult
         Update-TypeData -TypeName "ProxyTestResult" -DefaultDisplayPropertySet 'TestedHostname', 'DirectAccessPossible', 'Message' -Force
-        
+
         # set the current system proxy config, as config for the powershell session
         $oldProxy = [System.Net.WebRequest]::DefaultWebProxy;
         [System.Net.WebRequest]::DefaultWebProxy = $Proxy;
     }
-    
-    process {        
+
+    process {
         [ProxyTestResult]$output = New-Object ProxyTestResult;
         [System.Uri]$fullUri = $null;
         try {
@@ -54,7 +54,7 @@ function Test-ProxyConfiguration {
                 # this is for powershell 5.1
                 ($requestError.FullyQualifiedErrorId -eq "WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand")
             ) {
-                if($requestError.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::ServiceUnavailable){
+                if ($requestError.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::ServiceUnavailable) {
                     $output.originalException = $requestError;
                 }
                 $output.CreateMessage();
@@ -67,14 +67,14 @@ function Test-ProxyConfiguration {
             }
         }
     }
-    
+
     end {
         # clean up the custemized proxy
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy;
     }
 }
 
-class ProxyTestResult {    
+class ProxyTestResult {
     [string] $TestedHostname;
     [bool] $DirectAccessPossible;
     [bool] BypassListRecommended() { return $this.DirectAccessPossible; }
@@ -91,7 +91,7 @@ class ProxyTestResult {
             return;
         }
         if (
-            $this.IsOnBypassList -eq $false -and 
+            $this.IsOnBypassList -eq $false -and
             $this.DirectAccessPossible -and
             $null -eq $this.originalException) {
             $this.Message = "[WARN] You can access the site. The configuration isn't optimal, because you have direct access but uses the proxy. Add '$($this.TestedHostname)' to the ByPass list.";
@@ -102,14 +102,14 @@ class ProxyTestResult {
             return;
         }
         if (
-            $this.IsOnBypassList -eq $false -and 
+            $this.IsOnBypassList -eq $false -and
             $this.DirectAccessPossible -and
             $null -ne $this.originalException) {
             $this.Message = "[ERROR] You have direct access but uses the proxy. Add '$($this.TestedHostname)' to the ByPass list.";
             return;
         }
         if (
-            $this.IsOnBypassList -and 
+            $this.IsOnBypassList -and
             $this.DirectAccessPossible -eq $false) {
             $this.Message = "[ERROR] You must use the proxy. Remove '$($this.TestedHostname)' from the ByPass list.";
             return;
