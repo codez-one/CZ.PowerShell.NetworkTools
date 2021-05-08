@@ -5,6 +5,9 @@ Some tools to debug and analysis your network.
 ## Usage
 
 For the usage documentation see in the [docs](docs/Commands) folder.
+
+> Currently you must download the module manual, by downloading everything from the `src` folder and run: `Import-Module CZ.PowerShell.NetworkTools.psd1`;
+
 ## Contribute
 
 To contribute to this project do the following:
