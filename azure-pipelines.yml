@@ -35,13 +35,13 @@ steps:
     pwsh: true
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '**/bin/**.nupkg'
+    PathtoPublish: 'src/bin/**.nupkg'
     ArtifactName: 'drop'
     publishLocation: 'Container'
 - task: PublishTestResults@2
   inputs:
     testResultsFormat: 'NUnit'
-    testResultsFiles: '**/TEST-*.xml'
+    testResultsFiles: 'testResults.xml'
     failTaskOnFailedTests: true
     testRunTitle: 'CZ.PowerShell.NetworkTools'
 - task: PublishCodeCoverageResults@1
