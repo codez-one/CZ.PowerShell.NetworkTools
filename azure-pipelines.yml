@@ -38,7 +38,7 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      ls -Recurse;
+      ls -Recurse | select FullName;
     showWarnings: true
     pwsh: true
 - task: PublishBuildArtifacts@1
