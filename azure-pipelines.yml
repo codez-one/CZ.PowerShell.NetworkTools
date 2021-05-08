@@ -1,0 +1,52 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: windows-latest
+
+steps:
+- task: PowerShell@2
+  displayName: "Run pester tests"
+  inputs:
+    targetType: 'inline'
+    script: |
+      Install-Module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck Pester;
+      Import-Module Pester;
+      $configuration = [PesterConfiguration]::Default;
+      $configuration.CodeCoverage.Enabled = $true;
+      $configuration.CodeCoverage.Path = (Get-ChildItem src/*.ps1 | ForEach-Object{$_.FullName});
+      $configuration.CodeCoverage.OutputFormat = "JaCoCo";
+      $configuration.TestResult.Enabled = $true;
+      $configuration.Run.Exit = $true;
+      $configuration.Run.Path = (Get-ChildItem tests/*ps1 | ForEach-Object{$_.FullName});
+      Invoke-Pester -Configuration $configuration;
+    showWarnings: true
+    pwsh: true
+- task: PowerShell@2
+  displayName: "Build the powershell package"
+  inputs:
+    filePath: 'build/build.ps1'
+    showWarnings: true
+    pwsh: true
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: 'src/bin/*.nupkg'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'NUnit'
+    testResultsFiles: 'testResults.xml'
+    failTaskOnFailedTests: true
+    testRunTitle: 'CZ.PowerShell.NetworkTools'
+- task: PublishCodeCoverageResults@1
+  inputs:
+    codeCoverageTool: 'JaCoCo'
+    summaryFileLocation: 'coverage.xml'
+    pathToSources: 'src/'
+    failIfCoverageEmpty: true
