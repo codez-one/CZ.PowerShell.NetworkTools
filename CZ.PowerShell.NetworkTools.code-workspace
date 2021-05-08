@@ -5,7 +5,10 @@
 		}
 	],
 	"settings": {
-    	"files.trimTrailingWhitespace": true
+		"files.trimTrailingWhitespace": true,
+		"cSpell.words": [
+			"paule"
+		]
 	},
 	"extensions": {
 		"recommendations": [
@@ -16,7 +19,9 @@
 			// for good language in the docs
 			"streetsidesoftware.code-spell-checker",
 			// for well formatted documentation
-			"docsmsft.docs-authoring-pack"
+			"docsmsft.docs-authoring-pack",
+			// for good language
+			"streetsidesoftware.code-spell-checker"
 		]
 	}
 }
