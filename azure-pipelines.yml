@@ -43,7 +43,7 @@ steps:
     pwsh: true
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: 'src/bin/*.nupkg'
+    PathtoPublish: 'src/bin/'
     ArtifactName: 'drop'
     publishLocation: 'Container'
 - task: PublishTestResults@2
