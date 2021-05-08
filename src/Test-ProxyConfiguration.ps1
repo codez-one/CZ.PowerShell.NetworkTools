@@ -39,8 +39,13 @@ function Test-ProxyConfiguration {
 
         $output.IsOnBypassList = [System.Net.WebRequest]::DefaultWebProxy.IsBypassed($Uri);
         $output.TestedHostname = $fullUri.DnsSafeHost;
-        $netConnectionResult = Test-NetConnection $output.TestedHostname  -Port $fullUri.Port;
-        $output.DirectAccessPossible = $netConnectionResult.TcpTestSucceeded;
+        if($IsWindows){
+            $netConnectionResult = Test-NetConnection $output.TestedHostname  -Port $fullUri.Port;
+            $output.DirectAccessPossible = $netConnectionResult.TcpTestSucceeded;
+        }else{
+            $output.DirectAccessPossible = Test-Connection $output.TestedHostname  -TcpPort $fullUri.Port;
+        }
+
         try {
             Invoke-WebRequest $Uri -UseBasicParsing -ErrorAction Stop -MaximumRedirection 0 | Out-Null;
             $output.CreateMessage();
