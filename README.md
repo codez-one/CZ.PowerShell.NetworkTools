@@ -2,6 +2,9 @@
 
 Some tools to debug and analysis your network.
 
+## Usage
+
+For the usage documentation see in the [docs](docs/Commands) folder.
 ## Contribute
 
 To contribute to this project do the following:
