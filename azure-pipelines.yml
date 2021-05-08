@@ -25,6 +25,8 @@ steps:
       $configuration.Run.Exit = $true;
       $configuration.Run.Path = (Get-ChildItem tests/*ps1 | ForEach-Object{$_.FullName});
       Invoke-Pester -Configuration $configuration;
+    showWarnings: true
+    pwsh: true
 - task: PowerShell@2
   displayName: "Build the powershell package"
   inputs:
