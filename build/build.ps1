@@ -114,5 +114,5 @@ finally {
     #Remove-Module "./CZ.PowerShell.NetworkTools.psd1" -ErrorAction SilentlyContinue;
     $env:PSModulePath = $normalPsModulePath;
 }
-
+Get-ChildItem "$PSScriptRoot/../src/bin";
 
