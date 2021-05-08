@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest;
 function Test-ProxyConfiguration {
-    [CmdletBinding(HelpURI="https://raw.githubusercontent.com/codez-one/CZ.PowerShell.NetworkTools/main/docs/Commands/Test-ProxyConfiguration.md?token=ACWEZ3JHCNHLJL4YVKADZEDAS3EVM")]
+    [CmdletBinding(HelpURI="https://raw.githubusercontent.com/codez-one/CZ.PowerShell.NetworkTools/main/docs/Commands/Test-ProxyConfiguration.md")]
     param (
         # The target URL that you are trying to test.
         [Parameter(
