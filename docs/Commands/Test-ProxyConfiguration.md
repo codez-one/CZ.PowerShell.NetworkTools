@@ -1,15 +1,15 @@
-# Test-ProxyConfiguration.md
+# Test-CzProxyConfiguration.md
 
 ## SYNOPSIS
 
-The `Test-ProxyConfiguration` cmdlet test your proxy configuration. This can help if your company uses a proxy and you need help to debug the problem.
+The `Test-CzProxyConfiguration` cmdlet test your proxy configuration. This can help if your company uses a proxy and you need help to debug the problem.
 
 ## Syntax
 
 ### NameParameterSet (Default)
 
 ```powershell
-Test-ProxyConfiguration [-Uri] <String> [[-Proxy] <System.Net.IWebProxy>]
+Test-CzProxyConfiguration [-Uri] <String> [[-Proxy] <System.Net.IWebProxy>]
 ```
 
 ## Parameters
@@ -61,7 +61,7 @@ This will create the message from the test result. See `Message` field.
 ### Example 1
 
 ```powershell
-Test-ProxyConfiguration -Uri "https://bing.com/";
+Test-CzProxyConfiguration -Uri "https://bing.com/";
 ```
 
 This example will test, if you can reach the website `https://bing.com/` with your current system configuration.
@@ -69,7 +69,7 @@ This example will test, if you can reach the website `https://bing.com/` with yo
 ### Example 2
 
 ```powershell
-Test-ProxyConfiguration -Uri "https://bing.com/" -Proxy (New-Object System.Net.WebProxy("http://proxy.company.com:80"));
+Test-CzProxyConfiguration -Uri "https://bing.com/" -Proxy (New-Object System.Net.WebProxy("http://proxy.company.com:80"));
 ```
 
 This example will test, if you can reach the website `https://bing.com/` with the configured proxy from the `proxy` parameter.
@@ -79,7 +79,7 @@ This example will test, if you can reach the website `https://bing.com/` with th
 ```powershell
 $proxy = New-Object System.Net.WebProxy("http://proxy.company.com:80");
 $proxy.BypassList = @("bing.com")
-Test-ProxyConfiguration -Uri "https://bing.com/";
+Test-CzProxyConfiguration -Uri "https://bing.com/";
 ```
 
 This example will test, if you can reach the website `https://bing.com/` with the configured proxy from the `proxy` parameter. It configures also a bypass on the hostname `bing.com`.
