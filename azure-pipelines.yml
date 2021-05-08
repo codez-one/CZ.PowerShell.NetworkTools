@@ -33,6 +33,14 @@ steps:
     filePath: 'build/build.ps1'
     showWarnings: true
     pwsh: true
+- task: PowerShell@2
+  displayName: "Debug files"
+  inputs:
+    targetType: 'inline'
+    script: |
+      ls -Recurse;
+    showWarnings: true
+    pwsh: true
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: 'src/bin/*.nupkg'
