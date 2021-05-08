@@ -4,7 +4,7 @@ param (
     # Set this to false if you try to build a real release
     [Parameter()]
     [bool]
-    $Prerelease = $false,
+    $Prerelease = $true,
     # Update the specify version block
     [Parameter(Mandatory = $false)]
     [ValidateSet("None", "Patch", "Minor", "Major")]
@@ -47,6 +47,28 @@ function Get-ScriptFunctionNames {
         return , $functionNames.ToArray()
     }
 }
+
+function Install-Nuget {
+    <#
+.SYNOPSIS
+    This will install nuget if it's missing in the powershellget provider.
+
+.DESCRIPTION
+    Install nuget.exe for the powershellget provider if it's missing.
+    The solution is stolen from: https://sqldbawithabeard.com/2019/11/26/fixing-the-failed-to-generate-the-compressed-file-for-module-cprogram-filesdotnetdotnet-exe-error-when-deploying-to-the-powershell-gallery-using-azure-devops/
+#>
+    $Profilepowershellget = "$env:userprofile\AppData\Local\Microsoft\Windows\PowerShell\PowerShellGet\";
+
+    if (-Not(Test-Path $Profilepowershellget)) {
+        New-Item $Profilepowershellget -ItemType Directory;
+    }
+    if (Test-Path "$Profilepowershellget\nuget.exe") {
+        return;
+    }
+    $Url = 'https://aka.ms/psget-nugetexe';
+    $OutputFile = "$Profilepowershellget\nuget.exe";
+    Invoke-WebRequest -Uri $Url -OutFile $OutputFile;
+}
 $allFunctionNames = Get-ChildItem "$PSScriptRoot/../src/" -Filter "*.ps1" | ForEach-Object {
     return Get-ScriptFunctionNames $_;
 }
@@ -63,7 +85,10 @@ elseif ($VersionPosition -eq "Major") {
     $versionNumber = "$($manifest.Version.Major + 1).$($manifest.Version.Minor).$($manifest.Version.Build)";
 }
 $currentLocation = Get-Location;
+$repoName = "CZ.PowerShell.NetworkTools-$((New-Guid).Guid)";
 Set-Location $PSScriptRoot/../src/
+$normalPsModulePath = $env:PSModulePath;
+$env:PSModulePath = "$pwd;$($env:PSModulePath)";
 try {
     if ($Prerelease) {
         Update-ModuleManifest -Path "$PSScriptRoot/../src/CZ.PowerShell.NetworkTools.psd1" -FileList (Get-ChildItem "$PSScriptRoot/../src/" -Filter "*.ps1" | ForEach-Object { $_ }) -FunctionsToExport $allFunctionNames -Prerelease "-preview$((Get-Date).DayOfYear)$((Get-Date).Hour)$((Get-Date).Minute)$((Get-Date).Second)";
@@ -71,9 +96,23 @@ try {
     else {
         Update-ModuleManifest -Path "$PSScriptRoot/../src/CZ.PowerShell.NetworkTools.psd1" -FileList (Get-ChildItem "$PSScriptRoot/../src/" -Filter "*.ps1" | ForEach-Object { $_ }) -FunctionsToExport $allFunctionNames -ModuleVersion $versionNumber;
     }
+
+    ### create a nuget package
+    $repoPath = "$pwd/bin";
+    if (Test-Path $repoPath) {
+        Remove-Item $repoPath -Force -Recurse;
+    }
+    mkdir $repoPath -Force;
+    Install-Nuget;
+    Register-PSRepository -SourceLocation $repoPath -PublishLocation $repoPath -Name $repoName;
+
+    Publish-Module -Repository $repoName -Name "./CZ.PowerShell.NetworkTools.psd1";
 }
 finally {
-    Set-Location $currentLocation;
+    Set-Location $currentLocation -ErrorAction SilentlyContinue;
+    Unregister-PSRepository $repoName -ErrorAction SilentlyContinue;
+    #Remove-Module "./CZ.PowerShell.NetworkTools.psd1" -ErrorAction SilentlyContinue;
+    $env:PSModulePath = $normalPsModulePath;
 }
 
 
