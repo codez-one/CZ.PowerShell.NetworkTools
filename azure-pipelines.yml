@@ -16,6 +16,7 @@ steps:
     targetType: 'inline'
     script: |
       Install-Module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck Pester;
+      Import-Module Pester;
       $configuration = [PesterConfiguration]::Default;
       $configuration.CodeCoverage.Enabled = $true;
       $configuration.CodeCoverage.Path = (Get-ChildItem src/*.ps1 | ForEach-Object{$_.FullName});
