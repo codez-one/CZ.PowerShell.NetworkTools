@@ -39,7 +39,7 @@ function Test-ProxyConfiguration {
 
         $output.IsOnBypassList = [System.Net.WebRequest]::DefaultWebProxy.IsBypassed($Uri);
         $output.TestedHostname = $fullUri.DnsSafeHost;
-        if($IsWindows){
+        if($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows){
             $netConnectionResult = Test-NetConnection $output.TestedHostname  -Port $fullUri.Port;
             $output.DirectAccessPossible = $netConnectionResult.TcpTestSucceeded;
         }else{
