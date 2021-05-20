@@ -1,5 +1,5 @@
 Describe "Test-ProxyConfiguration" {
-    BeforeAll { 
+    BeforeAll {
         $fileInfo = Get-ChildItem $PSScriptRoot;
         $functionName = $fileInfo.Name.Split('.')[0];
         # load function to test
@@ -155,10 +155,10 @@ Describe "Test-ProxyConfiguration" {
             }
         }
     }
-    
+
 }
 Describe "ProxyTestResult" {
-    BeforeAll { 
+    BeforeAll {
         $fileInfo = Get-ChildItem $PSScriptRoot;
         $functionName = $fileInfo.Name.Split('.')[0];
         # load function to test
@@ -213,7 +213,7 @@ Describe "ProxyTestResult" {
             catch {
                 $Output.originalException = $_;
             }
-            
+
             $Output.TestedHostname = "somehostname";
             $Output.CreateMessage();
             $Output.Message | Should -Be "[ERROR] You have direct access but uses the proxy. Add '$($Output.TestedHostname)' to the ByPass list.":
@@ -230,7 +230,7 @@ Describe "ProxyTestResult" {
             catch {
                 $Output.originalException = $_;
             }
-            
+
             $Output.TestedHostname = "somehostname";
             $Output.CreateMessage();
             $Output.Message | Should -Be "[ERROR] The proxy configuration seems to be right! But something else happend. See the originalException.":
@@ -245,7 +245,7 @@ Describe "ProxyTestResult" {
             catch {
                 $Output.originalException = $_;
             }
-            
+
             $Output.TestedHostname = "somehostname";
             $Output.CreateMessage();
             $Output.Message | Should -Be "[ERROR] The proxy configuration seems to be right! But something else happend. See the originalException.":

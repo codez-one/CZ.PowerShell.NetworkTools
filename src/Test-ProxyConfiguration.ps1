@@ -59,7 +59,7 @@ function Test-ProxyConfiguration {
                 # this is for powershell 5.1
                 ($requestError.FullyQualifiedErrorId -eq "WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand")
             ) {
-                if ($requestError.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::ServiceUnavailable) {
+                if ($null -ne $requestError.Exception.Response -and $requestError.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::ServiceUnavailable) {
                     $output.originalException = $requestError;
                 }
                 $output.CreateMessage();
