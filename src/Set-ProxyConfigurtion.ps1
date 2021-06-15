@@ -98,8 +98,8 @@ function Set-NpmProxyConfiguration {
     . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)";
 
     $bypasstring = $(($Settings.BypassList -join ',').Trim());
-    . "npm" "config" "set" "noproxy" $bypasstring; # this is for npm verison >= 6.4.1
     . "npm" "config" "set" "no-proxy" "$bypasstring"; # this is for npm version < 6.4.1
+    . "npm" "config" "set" "noproxy" $bypasstring; # this is for npm verison >= 6.4.1
 }
 
 
