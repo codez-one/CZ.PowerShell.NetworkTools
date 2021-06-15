@@ -1,4 +1,5 @@
 function Set-ProxyConfiguration {
+    [CmdletBinding()]
     param (
         [string]
         $ConfigPath
@@ -20,9 +21,11 @@ function Set-ProxyConfiguration {
         }
     }
     Set-GitProxyConfiguration -Settings $proxySettings;
+    Set-NpmProxyConfiguration -Settings $proxySettings;
 }
 
 function Set-GitProxyConfiguration {
+    [CmdletBinding()]
     param (
         [ProxySetting]
         $Settings
@@ -32,6 +35,7 @@ function Set-GitProxyConfiguration {
         Write-Debug "Unable to find git on your system. Skip configuration";
         return;
     }
+    # set base address
     . "git" "config" "--global" "http.proxy" "$($Settings.ProxyAddress)";
     . "git" "config" "--global" "https.proxy" "$($Settings.ProxyAddress)";
 
@@ -78,11 +82,33 @@ function Set-GitProxyConfiguration {
     }
 }
 
+function Set-NpmProxyConfiguration {
+    [CmdletBinding()]
+    param (
+        [ProxySetting]
+        $Settings
+    )
+    if ($null -eq (Get-Command "npm" -ErrorAction SilentlyContinue))
+    {
+        Write-Debug "Unable to find npm on your system. Skip configuration";
+        return;
+    }
+    # set base address
+    . "npm" "config" "set" "proxy" "$($Settings.ProxyAddress)";
+    . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)";
+
+    $bypasstring = $(($Settings.BypassList -join ',').Trim());
+    . "npm" "config" "set" "noproxy" $bypasstring; # this is for npm verison >= 6.4.1
+    . "npm" "config" "set" "no-proxy" "$bypasstring"; # this is for npm version < 6.4.1
+}
+
 
 class ProxySetting {
     # TODO: implement http and https proxies can be different! 💣
     [string] $ProxyAddress = $null;
+    # TODO: how to handle credentials
     [pscredential] $ProxyCredentials = $null;
+    # TODO: are we allowed to override system proxy. (important for all .net applications, because they normaly use the system settings)
     [bool] $UseSystemProxyAddress = $false;
     [string[]] $BypassList;
 }
