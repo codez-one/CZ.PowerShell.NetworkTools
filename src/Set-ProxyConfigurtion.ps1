@@ -23,7 +23,6 @@ function Set-ProxyConfiguration {
             Write-Warning "You don't have set proxy credentials. If your system is configured with proxy credentials we can't read them.";
         }
     }
-    # TODO: exclude this to make my machine working while im testing.
     Set-GitProxyConfiguration -Settings $proxySettings;
     Set-NpmProxyConfiguration -Settings $proxySettings;
     Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
