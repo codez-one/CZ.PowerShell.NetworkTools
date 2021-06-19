@@ -4,24 +4,27 @@ function Set-ProxyConfiguration {
         [string]
         $ConfigPath
     )
-    if((Test-Path $ConfigPath) -eq $false){
+    if ((Test-Path $ConfigPath) -eq $false) {
         Write-Error "The config path doesn't exsists." -ErrorAction Stop;
     }
     [ProxySetting] $proxySettings = [ProxySetting] (Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json);
     Write-Debug $proxySettings;
-    if($proxySettings.UseSystemProxyAddress -and [string]::IsNullOrWhiteSpace($proxySettings.ProxyAddress)){
-        if($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows){
+    if ($proxySettings.UseSystemProxyAddress -and [string]::IsNullOrWhiteSpace($proxySettings.ProxyAddress)) {
+        if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
             $proxySettings.ProxyAddress = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').proxyServer;
-        }else{
+        }
+        else {
             # TODO: find a good way to get linux system proxy. For now throw exception
             Write-Error "Currently we don't support linux, to read out the system proxy. Please configure it manualy" -ErrorAction Stop;
         }
-        if($null -eq $proxySettings.ProxyCredentials){
+        if ($null -eq $proxySettings.ProxyCredentials) {
             Write-Warning "You don't have set proxy credentials. If your system is configured with proxy credentials we can't read them.";
         }
     }
+    # TODO: exclude this to make my machine working while im testing.
     Set-GitProxyConfiguration -Settings $proxySettings;
     Set-NpmProxyConfiguration -Settings $proxySettings;
+    Set-AptProxyConfiguration -Settings $proxySettings
 }
 
 function Set-GitProxyConfiguration {
@@ -30,8 +33,7 @@ function Set-GitProxyConfiguration {
         [ProxySetting]
         $Settings
     )
-    if ($null -eq (Get-Command "git" -ErrorAction SilentlyContinue))
-    {
+    if ($null -eq (Get-Command "git" -ErrorAction SilentlyContinue)) {
         Write-Debug "Unable to find git on your system. Skip configuration";
         return;
     }
@@ -42,13 +44,15 @@ function Set-GitProxyConfiguration {
     # only git version 2.13 or higher supports hostname wildcards
     $supportsWildcardHostnames = ((((git version) -split ' ')[2] -split '\.')[0] -ge 2) -and ((((git version) -split ' ')[2] -split '\.')[1] -ge 13);
     # set all new entries
-    $Settings.BypassList | ForEach-Object{
-        if($_ -contains '*' -and $supportsWildcardHostnames -eq $false){
+    $Settings.BypassList | ForEach-Object {
+        if ($_ -contains '*' -and $supportsWildcardHostnames -eq $false) {
             Write-Warning "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $_";
-        }else{
-            if($_.StartsWith("https")){
+        }
+        else {
+            if ($_.StartsWith("https")) {
                 . "git" "config" "--global" "https.$_.proxy" '""';
-            }else{
+            }
+            else {
                 . "git" "config" "--global" "http.$_.proxy" '""';
             }
         }
@@ -56,12 +60,12 @@ function Set-GitProxyConfiguration {
     }
     # remove old entries:
     # http
-    . "git" "config" "--global" "--get-regexp" "http\.http" | ForEach-Object{
+    . "git" "config" "--global" "--get-regexp" "http\.http" | ForEach-Object {
         $bypasskey = $_.Trim();
         if ($bypasskey -match "(http\.)(http.*)(\.proxy)") {
             $bypassedUrl = $matches[2].Trim();
-            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object{$_ -like $bypassedUrl});
-            if($shouldBeRemoved){
+            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { $_ -like $bypassedUrl });
+            if ($shouldBeRemoved) {
                 Write-Warning "Remove '$bypassedUrl' from git bypass list";
                 . "git" "config" "--global" "--unset" "$bypasskey";
             }
@@ -69,12 +73,12 @@ function Set-GitProxyConfiguration {
     }
 
     # https
-    . "git" "config" "--global" "--get-regexp" "https\.https"| ForEach-Object{
+    . "git" "config" "--global" "--get-regexp" "https\.https" | ForEach-Object {
         $bypasskey = $_.Trim();
         if ($bypasskey -match "(https\.)(https.*)(\.proxy)") {
             $bypassedUrl = $matches[2].Trim();
-            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object{$_ -like $bypassedUrl});
-            if($shouldBeRemoved){
+            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { $_ -like $bypassedUrl });
+            if ($shouldBeRemoved) {
                 Write-Warning "Remove '$bypassedUrl' from git bypass list";
                 . "git" "config" "--global" "--unset" "$bypasskey";
             }
@@ -88,8 +92,7 @@ function Set-NpmProxyConfiguration {
         [ProxySetting]
         $Settings
     )
-    if ($null -eq (Get-Command "npm" -ErrorAction SilentlyContinue))
-    {
+    if ($null -eq (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Debug "Unable to find npm on your system. Skip configuration";
         return;
     }
@@ -98,10 +101,46 @@ function Set-NpmProxyConfiguration {
     . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)";
 
     $bypasstring = $(($Settings.BypassList -join ',').Trim());
+    # TODO: only set the right format
     . "npm" "config" "set" "no-proxy" "$bypasstring"; # this is for npm version < 6.4.1
     . "npm" "config" "set" "noproxy" $bypasstring; # this is for npm verison >= 6.4.1
 }
 
+function Set-AptProxyConfiguration {
+    param (
+        [ProxySetting]
+        $Settings
+    )
+    if ($null -eq (Get-Command "apt" -ErrorAction SilentlyContinue)) {
+        Write-Debug "Unable to find apt on your system. Skip configuration";
+        return;
+    }
+    if ((Test-Path "/etc/apt/apt.conf") -eq $false) {
+        # just write the proxy into the file if it doesn't exsists
+        "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Set-Content "/etc/apt/apt.conf";
+    }
+    else {
+        $isAProxyAlreadConfigured = $null -ne (. "apt-config" "dump" "Acquire::http::proxy");
+        if ($isAProxyAlreadConfigured) {
+            $aptConfig = Get-Content "/etc/apt/apt.conf";
+            $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
+            Write-Verbose "$aptConfig";
+            $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
+
+            # replace the file with new content
+            $aptConfig | Set-Content "/etc/apt/apt.conf";
+        }
+        else {
+            # if no proxy is configured just append the line
+            "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";"| Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+        }
+    }
+
+    if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
+        Write-Warning "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
+    }
+
+}
 
 class ProxySetting {
     # TODO: implement http and https proxies can be different! 💣
