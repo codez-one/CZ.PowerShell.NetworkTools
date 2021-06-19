@@ -28,6 +28,7 @@ function Set-ProxyConfiguration {
     Set-NpmProxyConfiguration -Settings $proxySettings;
     Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
     Set-DockerProxyConfiguration -Settings $proxySettings;
+    Set-PowerShellProxyConfiguration -Settings $proxySettings;
 }
 
 function Set-GitProxyConfiguration {
@@ -55,9 +56,10 @@ function Set-GitProxyConfiguration {
             if ($_.StartsWith("https")) {
                 . "git" "config" "--global" "https.$_.proxy" '""';
             }
-            elseif($_.StartsWith("http")) {
+            elseif ($_.StartsWith("http")) {
                 . "git" "config" "--global" "http.$_.proxy" '""';
-            }else{
+            }
+            else {
                 . "git" "config" "--global" "http.http://$_.proxy" '""';
                 . "git" "config" "--global" "https.https://$_.proxy" '""';
             }
@@ -103,9 +105,9 @@ function Set-NpmProxyConfiguration {
         Write-Debug "Unable to find npm on your system. Skip configuration";
         return;
     }
-    if($npmCommand.Path.StartsWith('/mnt/c/Program Files/')){
+    if ($npmCommand.Path.StartsWith('/mnt/c/Program Files/')) {
         Write-Warning ("In WSL2 you must override your environment variables to the linux version of NPM. " + `
-        "We can't currently configure NPM for you.");
+                "We can't currently configure NPM for you.");
         return;
     }
     # set base address
@@ -129,7 +131,7 @@ function Set-AptProxyConfiguration {
         Write-Debug "Unable to find apt on your system. Skip configuration";
         return;
     }
-    try{
+    try {
         if ((Test-Path "/etc/apt/apt.conf") -eq $false) {
             # just write the proxy into the file if it doesn't exsists
             "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Set-Content "/etc/apt/apt.conf";
@@ -147,17 +149,19 @@ function Set-AptProxyConfiguration {
             }
             else {
                 # if no proxy is configured just append the line
-                "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";"| Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+                "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
             }
         }
         if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
             Write-Warning "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
         }
-    }catch [System.UnauthorizedAccessException]{
-        if($NoRoot){
+    }
+    catch [System.UnauthorizedAccessException] {
+        if ($NoRoot) {
             Write-Debug "Skip APT configuration because NORoot.";
             return;
-        }else{
+        }
+        else {
             Write-Error "You must be root to change APT settings." -TargetObject $_ -RecommendedAction "Run powershell as root or specify the `NoRoot` switch.";
             return;
         }
@@ -173,7 +177,7 @@ function Set-DockerProxyConfiguration {
     )
     if ($null -eq (Get-Command "docker" -ErrorAction SilentlyContinue)) {
         Write-Debug "Unable to find docker on your system. Skip configuration";
-        #return;
+        return;
     }
     $json = '{
         "proxies":
@@ -182,29 +186,149 @@ function Set-DockerProxyConfiguration {
             {
                 "httpProxy": "' + $Settings.ProxyAddress + '",
                 "httpsProxy": "' + $Settings.ProxyAddress + '",
-                "noProxy": "' + ($Settings.ProxyAddress -join ',')+ '"
+                "noProxy": "' + ($Settings.ProxyAddress -join ',') + '"
             }
         }
     }';
     Write-Verbose "$json";
     $proxyConfig = ConvertFrom-Json $json;
-    if((Test-Path "~/.docker/config.json")){
+    if ((Test-Path "~/.docker/config.json")) {
         $dockerConfig = (Get-Content "~/.docker/config.json" -Raw | ConvertFrom-Json);
-        if($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")){
+        if ($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
             $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig -TypeName $json;
-        }elseif($false -eq [bool]($dockerConfig.proxies.PSobject.Properties.name -match "default")){
+        }
+        elseif ($false -eq [bool]($dockerConfig.proxies.PSobject.Properties.name -match "default")) {
             $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig.proxies -TypeName $json;
-        }else{
+        }
+        else {
             $dockerConfig.proxies.default | Add-Member -NotePropertyName "httpProxy" -NotePropertyValue $Settings.ProxyAddress -Force
             $dockerConfig.proxies.default | Add-Member -NotePropertyName "httpsProxy" -NotePropertyValue $Settings.ProxyAddress -Force
             $dockerConfig.proxies.default | Add-Member -NotePropertyName "noProxy" -NotePropertyValue ($Settings.BypassList -join ',') -Force
         }
         ConvertTo-Json $dockerConfig | Set-Content "~/.docker/config.json";
-    }else{
+    }
+    else {
         New-Item "~/.docker" -Force -ItemType Directory | Out-Null;
 
         ConvertTo-Json $proxyConfig  | Set-Content "~/.docker/config.json" -Force;
     }
+}
+
+function Set-PowerShellProxyConfiguration {
+    param (
+        [ProxySetting]
+        $Settings,
+        [switch]
+        $NoRoot
+    )
+    if ($NoRoot) {
+        Write-Verbose "You can't set a proxy for powershell 5 / 7 without admin / root rights. On Windows try to set IE Settings if this is possible.";
+        return;
+    }
+    $proxyConfig = '<configuration>
+        <system.net>
+            <defaultProxy>
+            <proxy
+                usesystemdefault="true"
+                proxyaddress="'+ $Settings.ProxyAddress + '"
+                bypassonlocal="true"
+            />
+            <bypasslist>
+                '+ (
+        (($Settings.BypassList | ForEach-Object { "<add address=`"$_`" /> " }) -join [System.Environment]::NewLine)
+    ) + '
+            </bypasslist>
+            </defaultProxy>
+        </system.net>
+    </configuration>';
+    Write-Debug "$proxyConfig";
+    $powershellConfigExtension = [xml]$proxyConfig;
+    function Update-PowerShellConfig {
+        [CmdletBinding()]
+        param (
+            [Parameter()]
+            [string]
+            $powershellPath
+        )
+
+        $configPath = "$powershellPath.config";
+        if ((Test-Path $configPath) -eq $false) {
+            # set acls for windows
+            if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+                $installDir = (Get-Item $powershellPath).Directory.FullName;
+                # allow write access to the config file and save the file
+                $defaultAcl = Get-Acl "$installDir";
+                $aclForPowerShellFile = Get-Acl "$installDir";
+                $AdministratorsSID = New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-544';
+                $newRule = New-Object System.Security.AccessControl.FileSystemAccessRule($AdministratorsSID, @("Write"), "None", "InheritOnly", "Allow") ;
+                $aclForPowerShellFile.AddAccessRule($newRule);
+                Set-Acl -Path "$installDir" $aclForPowerShellFile;
+            }
+            New-Item $configPath -ItemType File | Out-Null;
+            if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+                #revoke access to default:
+                Set-Acl -Path "$installDir" $defaultAcl | Out-Null;
+            }
+        }
+
+        if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+            # allow write access to the config file and save the file
+            $defaultAcl = Get-Acl "$configPath";
+            $aclForPowerShellFile = Get-Acl "$configPath";
+            $AdministratorsSID = New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-544';
+            $newRule = New-Object System.Security.AccessControl.FileSystemAccessRule($AdministratorsSID, @("Write"), "None", "InheritOnly", "Allow") ;
+            $aclForPowerShellFile.AddAccessRule($newRule);
+            Set-Acl -Path "$configPath" $aclForPowerShellFile;
+        }
+        $powershellConfig = [xml](Get-Content "$configPath");
+        if ($null -eq $powershellConfig) {
+            $proxyConfig | Set-Content $configPath;
+        }
+        elseif ($null -eq $powershellConfig.configuration) {
+            $extensionNode = $powershellConfig.ImportNode($powershellConfigExtension.configuration, $true);
+            $powershellConfig.AppendChild($extensionNode) | Out-Null;
+        }
+        elseif ($null -eq $powershellConfig.configuration.'system.net') {
+            $extensionNode = $powershellConfig.configuration.OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net', $true);
+            $powershellConfig.configuration.AppendChild($extensionNode) | Out-Null;
+        }
+        else {
+            # remove old proxy config
+            $configuredDefaultProxy = $powershellConfig.configuration.GetElementsByTagName('system.net')[0].GetElementsByTagName("defaultProxy");
+            if ($null -ne $configuredDefaultProxy -and $configuredDefaultProxy.Count -gt 0) {
+                $powershellConfig.configuration.GetElementsByTagName('system.net')[0].RemoveChild($configuredDefaultProxy[0]) | Out-Null;
+            }
+            # add new proxy config
+            $extensionNode = $powershellConfig.configuration.GetElementsByTagName('system.net')[0].OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net'.defaultProxy, $true);
+            $powershellConfig.configuration.GetElementsByTagName('system.net')[0].AppendChild($extensionNode) | Out-Null;
+        }
+        if ($null -ne $powershellConfig) {
+            $powershellConfig.Save("$configPath") | Out-Null;
+        }
+        if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+            #revoke access to default:
+            Set-Acl -Path "$configPath" $defaultAcl | Out-Null;
+        }
+    }
+
+    # pwsh core
+    $powershell = (Get-Command "pwsh" -ErrorAction SilentlyContinue);
+    if ($null -eq $powershell) {
+        Write-Debug "Unable to find PowerShell 7 on your system. Skip configuration";
+    }
+    else {
+        Update-PowerShellConfig -powershellPath ($powershell.Path);
+    }
+
+    #Win powershell
+    $winPowershell = (Get-Command "powershell" -ErrorAction SilentlyContinue);
+    if ($null -eq $winPowershell) {
+        Write-Debug "Unable to find PowerShell < 6 on your system. Skip configuration";
+    }
+    else {
+        Update-PowerShellConfig -powershellPath ($winPowershell.Path);
+    }
+
 }
 
 class ProxySetting {
