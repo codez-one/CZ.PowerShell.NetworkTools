@@ -42,30 +42,37 @@ function Set-GitProxyConfiguration {
         Write-Debug "Unable to find git on your system. Skip configuration";
         return;
     }
-    # set base address
-    . "git" "config" "--global" "http.proxy" "$($Settings.ProxyAddress)";
-    . "git" "config" "--global" "https.proxy" "$($Settings.ProxyAddress)";
+    if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+        # unset base address
+        . "git" "config" "--global" "--unset" "http.proxy";
+        . "git" "config" "--global" "--unset" "https.proxy";
+    }
+    else {
+        # set base address
+        . "git" "config" "--global" "http.proxy" "$($Settings.ProxyAddress)";
+        . "git" "config" "--global" "https.proxy" "$($Settings.ProxyAddress)";
 
-    # only git version 2.13 or higher supports hostname wildcards
-    $supportsWildcardHostnames = ((((git version) -split ' ')[2] -split '\.')[0] -ge 2) -and ((((git version) -split ' ')[2] -split '\.')[1] -ge 13);
-    # set all new entries
-    $Settings.BypassList | ForEach-Object {
-        if ($_ -contains '*' -and $supportsWildcardHostnames -eq $false) {
-            Write-Warning "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $_";
-        }
-        else {
-            if ($_.StartsWith("https")) {
-                . "git" "config" "--global" "https.$_.proxy" '""';
-            }
-            elseif ($_.StartsWith("http")) {
-                . "git" "config" "--global" "http.$_.proxy" '""';
+        # only git version 2.13 or higher supports hostname wildcards
+        $supportsWildcardHostnames = ((((git version) -split ' ')[2] -split '\.')[0] -ge 2) -and ((((git version) -split ' ')[2] -split '\.')[1] -ge 13);
+        # set all new entries
+        $Settings.BypassList | ForEach-Object {
+            if ($_ -contains '*' -and $supportsWildcardHostnames -eq $false) {
+                Write-Warning "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $_";
             }
             else {
-                . "git" "config" "--global" "http.http://$_.proxy" '""';
-                . "git" "config" "--global" "https.https://$_.proxy" '""';
+                if ($_.StartsWith("https")) {
+                    . "git" "config" "--global" "https.$_.proxy" '""';
+                }
+                elseif ($_.StartsWith("http")) {
+                    . "git" "config" "--global" "http.$_.proxy" '""';
+                }
+                else {
+                    . "git" "config" "--global" "http.http://$_.proxy" '""';
+                    . "git" "config" "--global" "https.https://$_.proxy" '""';
+                }
             }
-        }
 
+        }
     }
     # remove old entries:
     # http
@@ -111,14 +118,15 @@ function Set-NpmProxyConfiguration {
                 "We can't currently configure NPM for you.");
         return;
     }
-    if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+    if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
         # unset base address
         . "npm" "config" "delete" "proxy";
         . "npm" "config" "delete" "https-proxy"
         # TODO: only set the right format
         . "npm" "config" "delete" "no-proxy"; # this is for npm version < 6.4.1
         . "npm" "config" "delete" "noproxy"; # this is for npm verison >= 6.4.1
-    }else{
+    }
+    else {
         # set base address
         . "npm" "config" "set" "proxy" "$($Settings.ProxyAddress)" | Out-Null;
         . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)" | Out-Null;
@@ -222,7 +230,7 @@ function Set-DockerProxyConfiguration {
     $proxyConfig = ConvertFrom-Json $json;
     if ((Test-Path "~/.docker/config.json")) {
         $dockerConfig = (Get-Content "~/.docker/config.json" -Raw | ConvertFrom-Json);
-        if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress) -and [bool]($dockerConfig.PSobject.Properties.name -match "proxies")){
+        if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress) -and [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
             $dockerConfig.PSobject.Properties.Remove('proxies');
         }
         elseif ($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
@@ -318,10 +326,11 @@ function Set-PowerShellProxyConfiguration {
         }
         $powershellConfig = [xml](Get-Content "$configPath");
         if ($null -eq $powershellConfig) {
-            if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+            if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
                 # no proxy should be confgiured
                 return;
-            }else{
+            }
+            else {
                 $proxyConfig | Set-Content $configPath;
             }
         }
@@ -339,7 +348,7 @@ function Set-PowerShellProxyConfiguration {
             if ($null -ne $configuredDefaultProxy -and $configuredDefaultProxy.Count -gt 0) {
                 $powershellConfig.configuration.GetElementsByTagName('system.net')[0].RemoveChild($configuredDefaultProxy[0]) | Out-Null;
             }
-            if($false -eq [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+            if ($false -eq [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
                 # add new proxy config
                 $extensionNode = $powershellConfig.configuration.GetElementsByTagName('system.net')[0].OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net'.defaultProxy, $true);
                 $powershellConfig.configuration.GetElementsByTagName('system.net')[0].AppendChild($extensionNode) | Out-Null;
