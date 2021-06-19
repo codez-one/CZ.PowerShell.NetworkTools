@@ -29,6 +29,7 @@ function Set-ProxyConfiguration {
     Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
     Set-DockerProxyConfiguration -Settings $proxySettings;
     Set-PowerShellProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
+    Set-EnvironmentProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
 }
 
 function Set-GitProxyConfiguration {
@@ -330,6 +331,48 @@ function Set-PowerShellProxyConfiguration {
         Update-PowerShellConfig -powershellPath ($winPowershell.Path);
     }
 
+}
+
+function Set-EnvironmentProxyConfiguration {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [ProxySetting]
+        $Settings,
+        [switch]
+        $NoRoot
+    )
+    if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+        # set the process to, to avoid the user must restart the process.
+        [Environment]::SetEnvironmentVariable("HTTP_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::Process)
+        [Environment]::SetEnvironmentVariable("HTTPS_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::Process)
+        [Environment]::SetEnvironmentVariable("NO_PROXY", $($Settings.BypassList -join ','), [EnvironmentVariableTarget]::Process)
+        if ($NoRoot) {
+            [Environment]::SetEnvironmentVariable("HTTPS_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::User)
+            [Environment]::SetEnvironmentVariable("HTTP_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::User)
+            [Environment]::SetEnvironmentVariable("NO_PROXY", $($Settings.BypassList -join ','), [EnvironmentVariableTarget]::User)
+        }
+        else {
+            # Set environment for all users
+            [Environment]::SetEnvironmentVariable("HTTP_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::Machine);
+            [Environment]::SetEnvironmentVariable("HTTPS_PROXY", $Settings.ProxyAddress, [EnvironmentVariableTarget]::Machine);
+            [Environment]::SetEnvironmentVariable("NO_PROXY", $($Settings.BypassList -join ','), [EnvironmentVariableTarget]::Machine)
+        }
+
+    }
+    else {
+        if ($NoRoot) {
+            Write-Warning "Currently to set the environment this script needs root rights. Didn't change any environment varables.";
+        }
+        else {
+            # Set environment for all users
+            "export http_proxy=`"$($Settings.ProxyAddress)`"
+            export no_proxy=`"$($Settings.BypassList -join ',')`"
+            export HTTP_PROXY=$($Settings.ProxyAddress)
+            export https_proxy=$($Settings.ProxyAddress)
+            export HTTPS_PROXY=$($Settings.ProxyAddress)" | Set-Content /etc/profile.d/proxy.sh;
+        }
+    }
 }
 
 class ProxySetting {
