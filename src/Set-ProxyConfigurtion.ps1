@@ -271,6 +271,7 @@ function Set-PowerShellProxyConfiguration {
             }
         }
 
+        # set acls for windows
         if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
             # allow write access to the config file and save the file
             $defaultAcl = Get-Acl "$configPath";
