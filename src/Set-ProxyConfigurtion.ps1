@@ -2,7 +2,9 @@ function Set-ProxyConfiguration {
     [CmdletBinding()]
     param (
         [string]
-        $ConfigPath
+        $ConfigPath,
+        [switch]
+        $NoRoot
     )
     if ((Test-Path $ConfigPath) -eq $false) {
         Write-Error "The config path doesn't exsists." -ErrorAction Stop;
@@ -24,7 +26,7 @@ function Set-ProxyConfiguration {
     # TODO: exclude this to make my machine working while im testing.
     Set-GitProxyConfiguration -Settings $proxySettings;
     Set-NpmProxyConfiguration -Settings $proxySettings;
-    Set-AptProxyConfiguration -Settings $proxySettings
+    Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
 }
 
 function Set-GitProxyConfiguration {
@@ -92,8 +94,14 @@ function Set-NpmProxyConfiguration {
         [ProxySetting]
         $Settings
     )
-    if ($null -eq (Get-Command "npm" -ErrorAction SilentlyContinue)) {
+    $npmCommand = (Get-Command "npm" -ErrorAction SilentlyContinue);
+    if ($null -eq $npmCommand) {
         Write-Debug "Unable to find npm on your system. Skip configuration";
+        return;
+    }
+    if($npmCommand.Path.StartsWith('/mnt/c/Program Files/')){
+        Write-Warning ("In WSL2 you must override your environment variables to the linux version of NPM. " + `
+        "We can't currently configure NPM for you.");
         return;
     }
     # set base address
@@ -109,36 +117,48 @@ function Set-NpmProxyConfiguration {
 function Set-AptProxyConfiguration {
     param (
         [ProxySetting]
-        $Settings
+        $Settings,
+        [switch]
+        $NoRoot
     )
     if ($null -eq (Get-Command "apt" -ErrorAction SilentlyContinue)) {
         Write-Debug "Unable to find apt on your system. Skip configuration";
         return;
     }
-    if ((Test-Path "/etc/apt/apt.conf") -eq $false) {
-        # just write the proxy into the file if it doesn't exsists
-        "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Set-Content "/etc/apt/apt.conf";
-    }
-    else {
-        $isAProxyAlreadConfigured = $null -ne (. "apt-config" "dump" "Acquire::http::proxy");
-        if ($isAProxyAlreadConfigured) {
-            $aptConfig = Get-Content "/etc/apt/apt.conf";
-            $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
-            Write-Verbose "$aptConfig";
-            $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
-
-            # replace the file with new content
-            $aptConfig | Set-Content "/etc/apt/apt.conf";
+    try{
+        if ((Test-Path "/etc/apt/apt.conf") -eq $false) {
+            # just write the proxy into the file if it doesn't exsists
+            "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Set-Content "/etc/apt/apt.conf";
         }
         else {
-            # if no proxy is configured just append the line
-            "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";"| Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+            $isAProxyAlreadConfigured = $null -ne (. "apt-config" "dump" "Acquire::http::proxy");
+            if ($isAProxyAlreadConfigured) {
+                $aptConfig = Get-Content "/etc/apt/apt.conf";
+                $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
+
+                $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
+
+                # replace the file with new content
+                $aptConfig | Set-Content "/etc/apt/apt.conf";
+            }
+            else {
+                # if no proxy is configured just append the line
+                "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";"| Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+            }
+        }
+        if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
+            Write-Warning "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
+        }
+    }catch [System.UnauthorizedAccessException]{
+        if($NoRoot){
+            Write-Debug "Skip APT configuration because NORoot.";
+            return;
+        }else{
+            Write-Error "You must be root to change APT settings." -TargetObject $_ -RecommendedAction "Run powershell as root or specify the `NoRoot` switch.";
+            return;
         }
     }
 
-    if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
-        Write-Warning "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
-    }
 
 }
 
