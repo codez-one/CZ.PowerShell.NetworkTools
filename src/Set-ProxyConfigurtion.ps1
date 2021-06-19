@@ -28,7 +28,7 @@ function Set-ProxyConfiguration {
     Set-NpmProxyConfiguration -Settings $proxySettings;
     Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
     Set-DockerProxyConfiguration -Settings $proxySettings;
-    Set-PowerShellProxyConfiguration -Settings $proxySettings;
+    Set-PowerShellProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
 }
 
 function Set-GitProxyConfiguration {
