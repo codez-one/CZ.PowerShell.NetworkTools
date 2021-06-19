@@ -134,6 +134,10 @@ function Set-AptProxyConfiguration {
     }
     try {
         if ((Test-Path "/etc/apt/apt.conf") -eq $false) {
+            if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+                # do nothing if no proxy should be configured and the config file don't exsists.
+                return;
+            }
             # just write the proxy into the file if it doesn't exsists
             "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Set-Content "/etc/apt/apt.conf";
         }
@@ -141,16 +145,29 @@ function Set-AptProxyConfiguration {
             $isAProxyAlreadConfigured = $null -ne (. "apt-config" "dump" "Acquire::http::proxy");
             if ($isAProxyAlreadConfigured) {
                 $aptConfig = Get-Content "/etc/apt/apt.conf";
-                $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
-
-                $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
-
+                if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+                    # delete proxy config
+                    $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "";
+                    $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}`${5}";
+                }
+                else {
+                    # add proxy config
+                    $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
+                    $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
+                }
                 # replace the file with new content
                 $aptConfig | Set-Content "/etc/apt/apt.conf";
             }
             else {
-                # if no proxy is configured just append the line
-                "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+                if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+                    # it's okay if no proxy is configured
+                    return;
+                }
+                else {
+                    # if no proxy is configured just append the line
+                    "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+                }
+
             }
         }
         if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
@@ -195,10 +212,14 @@ function Set-DockerProxyConfiguration {
     $proxyConfig = ConvertFrom-Json $json;
     if ((Test-Path "~/.docker/config.json")) {
         $dockerConfig = (Get-Content "~/.docker/config.json" -Raw | ConvertFrom-Json);
-        if ($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
+        if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress) -and [bool]($dockerConfig.PSobject.Properties.name -match "proxies")){
+            $dockerConfig.PSobject.Properties.Remove('proxies');
+        }
+        elseif ($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
             $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig -TypeName $json;
         }
         elseif ($false -eq [bool]($dockerConfig.proxies.PSobject.Properties.name -match "default")) {
+
             $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig.proxies -TypeName $json;
         }
         else {
@@ -209,8 +230,11 @@ function Set-DockerProxyConfiguration {
         ConvertTo-Json $dockerConfig | Set-Content "~/.docker/config.json";
     }
     else {
+        if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+            # no proxy should be configured.
+            return;
+        }
         New-Item "~/.docker" -Force -ItemType Directory | Out-Null;
-
         ConvertTo-Json $proxyConfig  | Set-Content "~/.docker/config.json" -Force;
     }
 }
@@ -284,13 +308,18 @@ function Set-PowerShellProxyConfiguration {
         }
         $powershellConfig = [xml](Get-Content "$configPath");
         if ($null -eq $powershellConfig) {
-            $proxyConfig | Set-Content $configPath;
+            if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+                # no proxy should be confgiured
+                return;
+            }else{
+                $proxyConfig | Set-Content $configPath;
+            }
         }
-        elseif ($null -eq $powershellConfig.configuration) {
+        elseif ($null -eq $powershellConfig.configuration -and $false -eq [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
             $extensionNode = $powershellConfig.ImportNode($powershellConfigExtension.configuration, $true);
             $powershellConfig.AppendChild($extensionNode) | Out-Null;
         }
-        elseif ($null -eq $powershellConfig.configuration.'system.net') {
+        elseif ($null -eq $powershellConfig.configuration.'system.net' -and $false -eq [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
             $extensionNode = $powershellConfig.configuration.OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net', $true);
             $powershellConfig.configuration.AppendChild($extensionNode) | Out-Null;
         }
@@ -300,9 +329,11 @@ function Set-PowerShellProxyConfiguration {
             if ($null -ne $configuredDefaultProxy -and $configuredDefaultProxy.Count -gt 0) {
                 $powershellConfig.configuration.GetElementsByTagName('system.net')[0].RemoveChild($configuredDefaultProxy[0]) | Out-Null;
             }
-            # add new proxy config
-            $extensionNode = $powershellConfig.configuration.GetElementsByTagName('system.net')[0].OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net'.defaultProxy, $true);
-            $powershellConfig.configuration.GetElementsByTagName('system.net')[0].AppendChild($extensionNode) | Out-Null;
+            if($false -eq [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+                # add new proxy config
+                $extensionNode = $powershellConfig.configuration.GetElementsByTagName('system.net')[0].OwnerDocument.ImportNode($powershellConfigExtension.configuration.'system.net'.defaultProxy, $true);
+                $powershellConfig.configuration.GetElementsByTagName('system.net')[0].AppendChild($extensionNode) | Out-Null;
+            }
         }
         if ($null -ne $powershellConfig) {
             $powershellConfig.Save("$configPath") | Out-Null;
