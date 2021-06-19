@@ -27,6 +27,7 @@ function Set-ProxyConfiguration {
     Set-GitProxyConfiguration -Settings $proxySettings;
     Set-NpmProxyConfiguration -Settings $proxySettings;
     Set-AptProxyConfiguration -Settings $proxySettings -NoRoot:$NoRoot;
+    Set-DockerProxyConfiguration -Settings $proxySettings;
 }
 
 function Set-GitProxyConfiguration {
@@ -54,8 +55,11 @@ function Set-GitProxyConfiguration {
             if ($_.StartsWith("https")) {
                 . "git" "config" "--global" "https.$_.proxy" '""';
             }
-            else {
+            elseif($_.StartsWith("http")) {
                 . "git" "config" "--global" "http.$_.proxy" '""';
+            }else{
+                . "git" "config" "--global" "http.http://$_.proxy" '""';
+                . "git" "config" "--global" "https.https://$_.proxy" '""';
             }
         }
 
@@ -78,7 +82,7 @@ function Set-GitProxyConfiguration {
     . "git" "config" "--global" "--get-regexp" "https\.https" | ForEach-Object {
         $bypasskey = $_.Trim();
         if ($bypasskey -match "(https\.)(https.*)(\.proxy)") {
-            $bypassedUrl = $matches[2].Trim();
+            $bypassedUrl = $Matches[2].Trim();
             $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { $_ -like $bypassedUrl });
             if ($shouldBeRemoved) {
                 Write-Warning "Remove '$bypassedUrl' from git bypass list";
@@ -160,6 +164,47 @@ function Set-AptProxyConfiguration {
     }
 
 
+}
+
+function Set-DockerProxyConfiguration {
+    param (
+        [ProxySetting]
+        $Settings
+    )
+    if ($null -eq (Get-Command "docker" -ErrorAction SilentlyContinue)) {
+        Write-Debug "Unable to find docker on your system. Skip configuration";
+        #return;
+    }
+    $json = '{
+        "proxies":
+        {
+            "default":
+            {
+                "httpProxy": "' + $Settings.ProxyAddress + '",
+                "httpsProxy": "' + $Settings.ProxyAddress + '",
+                "noProxy": "' + ($Settings.ProxyAddress -join ',')+ '"
+            }
+        }
+    }';
+    Write-Verbose "$json";
+    $proxyConfig = ConvertFrom-Json $json;
+    if((Test-Path "~/.docker/config.json")){
+        $dockerConfig = (Get-Content "~/.docker/config.json" -Raw | ConvertFrom-Json);
+        if($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")){
+            $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig -TypeName $json;
+        }elseif($false -eq [bool]($dockerConfig.proxies.PSobject.Properties.name -match "default")){
+            $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig.proxies -TypeName $json;
+        }else{
+            $dockerConfig.proxies.default | Add-Member -NotePropertyName "httpProxy" -NotePropertyValue $Settings.ProxyAddress -Force
+            $dockerConfig.proxies.default | Add-Member -NotePropertyName "httpsProxy" -NotePropertyValue $Settings.ProxyAddress -Force
+            $dockerConfig.proxies.default | Add-Member -NotePropertyName "noProxy" -NotePropertyValue ($Settings.BypassList -join ',') -Force
+        }
+        ConvertTo-Json $dockerConfig | Set-Content "~/.docker/config.json";
+    }else{
+        New-Item "~/.docker" -Force -ItemType Directory | Out-Null;
+
+        ConvertTo-Json $proxyConfig  | Set-Content "~/.docker/config.json" -Force;
+    }
 }
 
 class ProxySetting {
