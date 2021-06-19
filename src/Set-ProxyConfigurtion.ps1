@@ -73,7 +73,7 @@ function Set-GitProxyConfiguration {
         $bypasskey = $_.Trim();
         if ($bypasskey -match "(http\.)(http.*)(\.proxy)") {
             $bypassedUrl = $matches[2].Trim();
-            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { $_ -like $bypassedUrl });
+            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { "http://$_" -like $bypassedUrl });
             if ($shouldBeRemoved) {
                 Write-Warning "Remove '$bypassedUrl' from git bypass list";
                 . "git" "config" "--global" "--unset" "$bypasskey";
@@ -86,7 +86,7 @@ function Set-GitProxyConfiguration {
         $bypasskey = $_.Trim();
         if ($bypasskey -match "(https\.)(https.*)(\.proxy)") {
             $bypassedUrl = $Matches[2].Trim();
-            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { $_ -like $bypassedUrl });
+            $shouldBeRemoved = $null -eq ($Settings.BypassList | Where-Object { "https://$_" -like $bypassedUrl });
             if ($shouldBeRemoved) {
                 Write-Warning "Remove '$bypassedUrl' from git bypass list";
                 . "git" "config" "--global" "--unset" "$bypasskey";
@@ -111,14 +111,24 @@ function Set-NpmProxyConfiguration {
                 "We can't currently configure NPM for you.");
         return;
     }
-    # set base address
-    . "npm" "config" "set" "proxy" "$($Settings.ProxyAddress)";
-    . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)";
+    if([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)){
+        # unset base address
+        . "npm" "config" "delete" "proxy";
+        . "npm" "config" "delete" "https-proxy"
+        # TODO: only set the right format
+        . "npm" "config" "delete" "no-proxy"; # this is for npm version < 6.4.1
+        . "npm" "config" "delete" "noproxy"; # this is for npm verison >= 6.4.1
+    }else{
+        # set base address
+        . "npm" "config" "set" "proxy" "$($Settings.ProxyAddress)" | Out-Null;
+        . "npm" "config" "set" "https-proxy" "$($Settings.ProxyAddress)" | Out-Null;
 
-    $bypasstring = $(($Settings.BypassList -join ',').Trim());
-    # TODO: only set the right format
-    . "npm" "config" "set" "no-proxy" "$bypasstring"; # this is for npm version < 6.4.1
-    . "npm" "config" "set" "noproxy" $bypasstring; # this is for npm verison >= 6.4.1
+        $bypasstring = $(($Settings.BypassList -join ',').Trim());
+        # TODO: only set the right format
+        . "npm" "config" "set" "no-proxy" "$bypasstring" | Out-Null; # this is for npm version < 6.4.1
+        . "npm" "config" "set" "noproxy" $bypasstring | Out-Null; # this is for npm verison >= 6.4.1
+    }
+
 }
 
 function Set-AptProxyConfiguration {
