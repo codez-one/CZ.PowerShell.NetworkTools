@@ -6,13 +6,14 @@ function Set-ProxyConfiguration {
         [switch]
         $NoRoot
     )
-    if ((Test-Path $ConfigPath) -eq $false) {
+    if ((Test-Path -Path $ConfigPath) -eq $false) {
         Write-Error "The config path doesn't exsists." -ErrorAction Stop;
     }
     [ProxySetting] $proxySettings = [ProxySetting] (Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json);
     Write-Debug $proxySettings;
     if ($proxySettings.UseSystemProxyAddress -and [string]::IsNullOrWhiteSpace($proxySettings.ProxyAddress)) {
         if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
+            
             $proxySettings.ProxyAddress = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').proxyServer;
         }
         else {
