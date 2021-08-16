@@ -12,7 +12,6 @@
 		]
 	},
 	"extensions": {
-		"recommendations": [
 			// for the powershell scripts
 			"ms-vscode.powershell",
 			// for the jupiter notebook integration for powershell
@@ -20,9 +19,6 @@
 			// for good language in the docs
 			"streetsidesoftware.code-spell-checker",
 			// for well formatted documentation
-			"docsmsft.docs-authoring-pack",
-			// for good language
-			"streetsidesoftware.code-spell-checker"
-		]
+			"docsmsft.docs-authoring-pack"
 	}
 }
