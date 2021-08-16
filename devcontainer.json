@@ -1,1 +1,28 @@
-CZ.PowerShell.NetworkTools.code-workspace
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.trimTrailingWhitespace": true,
+		"cSpell.words": [
+			"cmdlet",
+			"paule"
+		]
+	},
+	"extensions": {
+		"recommendations": [
+			// for the powershell scripts
+			"ms-vscode.powershell",
+			// for the jupiter notebook integration for powershell
+			"ms-dotnettools.dotnet-interactive-vscode",
+			// for good language in the docs
+			"streetsidesoftware.code-spell-checker",
+			// for well formatted documentation
+			"docsmsft.docs-authoring-pack",
+			// for good language
+			"streetsidesoftware.code-spell-checker"
+		]
+	}
+}
