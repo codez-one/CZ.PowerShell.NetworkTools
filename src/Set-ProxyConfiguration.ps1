@@ -73,7 +73,7 @@ function Set-GitProxyConfiguration {
 
         }
     }
-    # remove old entries:
+    # remove old bypasses entries:
     # http
     . "git" "config" "--global" "--get-regexp" "http\.http" | ForEach-Object {
         $bypasskey = $_.Trim();
