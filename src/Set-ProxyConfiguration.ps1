@@ -13,7 +13,6 @@ function Set-ProxyConfiguration {
     Write-Debug $proxySettings;
     if ($proxySettings.UseSystemProxyAddress -and [string]::IsNullOrWhiteSpace($proxySettings.ProxyAddress)) {
         if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
-            
             $proxySettings.ProxyAddress = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').proxyServer;
         }
         else {
@@ -413,14 +412,32 @@ function Set-EnvironmentProxyConfiguration {
     else {
         if ($NoRoot) {
             Write-Warning "Currently to set the environment this script needs root rights. Didn't change any environment varables.";
+            # TODO: add user proxy settings for this case.
+
         }
         else {
             # Set environment for all users
-            "export http_proxy=`"$($Settings.ProxyAddress)`"
-            export no_proxy=`"$($Settings.BypassList -join ',')`"
-            export HTTP_PROXY=$($Settings.ProxyAddress)
-            export https_proxy=$($Settings.ProxyAddress)
-            export HTTPS_PROXY=$($Settings.ProxyAddress)" | Set-Content /etc/profile.d/proxy.sh;
+            $proxyshFilePath = "/etc/profile.d/proxy.sh";
+            if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+            # Remove this content from the file, because a line with:
+            # `something=`
+            # is an error for some tools. So the lines must be empty
+                if(Test-Path -Path $proxyshFilePath){
+                    Remove-Item -Path "/etc/profile.d/proxy.sh" -Force;
+                    Write-Verbose "$proxyshFilePath deleted. Proxy settings are resetted.";
+                }
+                else{
+                    Write-Verbose "$proxyshFilePath didn't exsist. Nothing changed.";
+                }
+
+            }
+            else {
+                "export http_proxy=`"$($Settings.ProxyAddress)`"
+                export no_proxy=`"$($Settings.BypassList -join ',')`"
+                export HTTP_PROXY=$($Settings.ProxyAddress)
+                export https_proxy=$($Settings.ProxyAddress)
+                export HTTPS_PROXY=$($Settings.ProxyAddress)" | Set-Content -Path $proxyshFilePath;
+            }
         }
     }
 }
