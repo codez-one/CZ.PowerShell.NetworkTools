@@ -118,4 +118,47 @@ Describe "Set-ProxyConfiguration" {
             }
         }
     }
+    Describe "the git function"{
+        Context "When Set-GitProxyConfiguration is okay and"{
+            It("'git' is undefined, it shouldn't throw an error."){
+                Mock -Verifiable Get-Command {
+                    Write-Error "not found";
+                }
+                # act
+                Set-GitProxyConfiguration -Settings $null;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "git"};
+            }
+            It("if no proxy should be setted, the proxy should be unset."){
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable "git" {
+                    if($args[2] -eq "--get-regexp"){
+                        if($args[3] -eq "http\.http"){
+                            "http.http://codez.one.proxy ";
+                        }else{
+                            "https.https://codez.one.proxy ";
+                        }
+                    }
+                    return;
+                }
+                # act
+                Set-GitProxyConfiguration -Settings $null;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "git"};
+                ## reset proxy entries
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "http.proxy"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "https.proxy"};
+                ## reset bypass
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--get-regexp" -and $args[3] -eq "http\.http"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--get-regexp" -and $args[3] -eq "https\.https"};
+                ## the removed bypassed is trimmed and in the right way combined
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "http.http://codez.one.proxy"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "https.https://codez.one.proxy"};
+                ## at the end there should be not more then 6 calls
+                Assert-MockCalled "git" -Times 6 -Exactly;
+            }
+        }
+    }
 }
