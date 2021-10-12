@@ -22,7 +22,9 @@
 			// for well formatted documentation
 			"docsmsft.docs-authoring-pack",
 			// for good language
-			"streetsidesoftware.code-spell-checker"
+			"streetsidesoftware.code-spell-checker",
+			// for pester tests
+			"pspester.pester-test"
 		]
 	}
 }
