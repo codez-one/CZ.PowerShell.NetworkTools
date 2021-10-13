@@ -139,6 +139,7 @@ function Set-NpmProxyConfiguration {
 }
 
 function Set-AptProxyConfiguration {
+    [CmdletBinding()]
     param (
         [ProxySetting]
         $Settings,
@@ -160,19 +161,25 @@ function Set-AptProxyConfiguration {
         }
         else {
             $isAProxyAlreadConfigured = $null -ne (. "apt-config" "dump" "Acquire::http::proxy");
+            $regexOptions = [System.Text.RegularExpressions.RegexOptions]([System.Text.RegularExpressions.RegexOptions]::Multiline);
+            $regexSimplePattern = "Acquire::http::Proxy .*;";
+            $regexComplexPattern = "(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy "".+"";)((.|\n)*}(.|\n)*})$";
+            $regexSimple = New-Object System.Text.RegularExpressions.Regex $regexSimplePattern, $regexOptions;
+            $regexComplex = New-Object System.Text.RegularExpressions.Regex $regexComplexPattern, $regexOptions;
             if ($isAProxyAlreadConfigured) {
                 $aptConfig = Get-Content "/etc/apt/apt.conf";
                 if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
                     # delete proxy config
-                    $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "";
-                    $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}`${5}";
+                    $aptConfig = $regexSimple.Replace($aptConfig, "");
+                    $aptConfig = $regexComplex.Replace($aptConfig, "`${1}`${5}");
                 }
                 else {
                     # add proxy config
-                    $aptConfig = "$aptConfig" -replace 'Acquire::http::Proxy .*;', "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";";
-                    $aptConfig = "$aptConfig" -replace '(^Acquire.*{(.|\n)*http.*{(.|\n)*)(proxy ".+";)((.|\n)*}(.|\n)*})$', "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}";
+                    $aptConfig = $regexSimple.Replace($aptConfig, "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";");
+                    $aptConfig = $regexComplex.Replace($aptConfig, "`${1}Proxy `"$($Settings.ProxyAddress)`";`${5}");
                 }
                 # replace the file with new content
+                Write-Warning $aptConfig;
                 $aptConfig | Set-Content "/etc/apt/apt.conf";
             }
             else {
@@ -182,9 +189,8 @@ function Set-AptProxyConfiguration {
                 }
                 else {
                     # if no proxy is configured just append the line
-                    "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Add-Content -Encoding ascii -NoNewline - >> "/etc/apt/apt.conf";
+                    "Acquire::http::Proxy ""$($Settings.ProxyAddress)"";" | Add-Content -Encoding ascii -NoNewline -Path "/etc/apt/apt.conf";
                 }
-
             }
         }
         if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
@@ -197,7 +203,7 @@ function Set-AptProxyConfiguration {
             return;
         }
         else {
-            Write-Error "You must be root to change APT settings." -TargetObject $_ -RecommendedAction "Run powershell as root or specify the `NoRoot` switch.";
+            Write-Error "You must be root to change APT settings." -TargetObject $_ -RecommendedAction "Run powershell as root or specify the `NoRoot` switch." -ErrorAction Stop;
             return;
         }
     }
