@@ -228,7 +228,7 @@ function Set-DockerProxyConfiguration {
             {
                 "httpProxy": "' + $Settings.ProxyAddress + '",
                 "httpsProxy": "' + $Settings.ProxyAddress + '",
-                "noProxy": "' + ($Settings.ProxyAddress -join ',') + '"
+                "noProxy": "' + ($Settings.BypassList -join ',') + '"
             }
         }
     }';
@@ -240,11 +240,11 @@ function Set-DockerProxyConfiguration {
             $dockerConfig.PSobject.Properties.Remove('proxies');
         }
         elseif ($false -eq [bool]($dockerConfig.PSobject.Properties.name -match "proxies")) {
-            $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig -TypeName $json;
+            $dockerConfig |  Add-Member -MemberType NoteProperty -Name "proxies" -Value $proxyConfig.proxies;
         }
         elseif ($false -eq [bool]($dockerConfig.proxies.PSobject.Properties.name -match "default")) {
 
-            $dockerConfig | Add-Member -NotePropertyMembers $proxyConfig.proxies -TypeName $json;
+            $dockerConfig.proxies | Add-Member -MemberType NoteProperty -Name "default" -Value $proxyConfig.proxies.default;
         }
         else {
             $dockerConfig.proxies.default | Add-Member -NotePropertyName "httpProxy" -NotePropertyValue $Settings.ProxyAddress -Force
