@@ -244,4 +244,75 @@ Describe "Set-ProxyConfiguration" {
         }
         ## TODO: add tests if the bypass list isn't clean
     }
+    Describe "the npm function"{
+        Context "When Set-NpmProxyConfiguration is okay and"{
+            It("'npm' is undefined, it shouldn't throw an error."){
+                Mock -Verifiable Get-Command {
+                    Write-Error "not found";
+                }
+                Mock -Verifiable "npm" {
+                    return;
+                }
+                # act
+                Set-NpmProxyConfiguration -Settings $null;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "npm"};
+                Assert-MockCalled "npm" -Exactly -Times 0;
+            }
+            It("wsl is active and npm on the path, is the windows npm, it should write an warning."){
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "/mnt/c/Program Files/nodejs/npm"};
+                }
+                Mock -Verifiable "npm" {
+                    return;
+                }
+                # act
+                Set-NpmProxyConfiguration -Settings $null -WarningVariable warning;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "npm"};
+                $warning | Should -Be ("In WSL2 you must override your environment variables to the linux version of NPM. " + `
+                "We can't currently configure NPM for you.");
+                Assert-MockCalled "npm" -Exactly -Times 0;
+            }
+            It("no proxy setting is defined, it should reset all npm proxy settings."){
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "something"};
+                }
+                Mock -Verifiable "npm" {
+                    return;
+                }
+                # act
+                Set-NpmProxyConfiguration -Settings $null -WarningVariable warning;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "npm"};
+                ## remove all proxy settings
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "delete" -and $args[2] -eq "proxy"};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "delete" -and $args[2] -eq "https-proxy"};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "delete" -and $args[2] -eq "no-proxy"};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "delete" -and $args[2] -eq "noproxy"};
+                Assert-MockCalled "npm" -Exactly -Times 4;
+            }
+            It("and proxy settings are defined, it should set all npm proxy settings."){
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "something"};
+                }
+                Mock -Verifiable "npm" {
+                    return;
+                }
+                # act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                Set-NpmProxyConfiguration -Settings $settings -WarningVariable warning;
+                #assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "npm"};
+                ## remove all proxy settings
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "set" -and $args[2] -eq "proxy" -and $args[3] -eq $settings.ProxyAddress};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "set" -and $args[2] -eq "https-proxy" -and $args[3] -eq $settings.ProxyAddress};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "set" -and $args[2] -eq "no-proxy" -and $args[3] -eq $(($settings.BypassList -join ',').Trim())};
+                Assert-MockCalled "npm" -Times 1 -ParameterFilter {$args[0] -eq "config" -and $args[1] -eq "set" -and $args[2] -eq "noproxy" -and $args[3] -eq $(($settings.BypassList -join ',').Trim())};
+                Assert-MockCalled "npm" -Exactly -Times 4;
+            }
+        }
+    }
 }
