@@ -212,6 +212,7 @@ function Set-AptProxyConfiguration {
 }
 
 function Set-DockerProxyConfiguration {
+    [CmdletBinding()]
     param (
         [ProxySetting]
         $Settings
@@ -263,6 +264,7 @@ function Set-DockerProxyConfiguration {
 }
 
 function Set-PowerShellProxyConfiguration {
+    [CmdletBinding()]
     param (
         [ProxySetting]
         $Settings,
