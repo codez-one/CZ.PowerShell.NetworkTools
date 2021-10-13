@@ -124,10 +124,14 @@ Describe "Set-ProxyConfiguration" {
                 Mock -Verifiable Get-Command {
                     Write-Error "not found";
                 }
+                Mock -Verifiable "git" {
+                    return;
+                }
                 # act
                 Set-GitProxyConfiguration -Settings $null;
                 #assert
                 Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "git"};
+                Assert-MockCalled "git" -Exactly -Times 0;
             }
             It("if no proxy should be setted, the proxy should be unset."){
                 Mock -Verifiable Get-Command {
@@ -159,6 +163,85 @@ Describe "Set-ProxyConfiguration" {
                 ## at the end there should be not more then 6 calls
                 Assert-MockCalled "git" -Times 6 -Exactly;
             }
+            It("a proxy configuration is required all git commands are running"){
+                # arrange
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable "git" {
+                    if($args[2] -eq "--get-regexp"){
+                        if($args[3] -eq "http\.http"){
+                            "http.http://not.okay.proxy ";
+                        }else{
+                            "https.https://not.okay.proxy ";
+                        }
+                    }
+                    if($args[0] -eq "version"){
+                        return "git version 200.250.100"
+                    }
+                    return;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "http://codez.one", "https://codez.one";
+                # act
+                Set-GitProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "git"};
+                ## set proxy entries
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "http.proxy" -and $args[3] -eq $settings.ProxyAddress};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "https.proxy" -and $args[3] -eq $settings.ProxyAddress};
+                ## set new bypass entries
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "http.http://codez.one.proxy"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "https.https://codez.one.proxy"};
+                ## reset old bypass
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--get-regexp" -and $args[3] -eq "http\.http"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--get-regexp" -and $args[3] -eq "https\.https"};
+                ## the removed bypassed is trimmed and in the right way combined
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "http.http://not.okay.proxy"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "--unset" -and $args[3] -eq "https.https://not.okay.proxy"};
+                ## git version is called
+                Assert-MockCalled "git" -Times 2 -Exactly -ParameterFilter {$args[0] -eq 'version'};
+                ## at the end there should be not more then 6 calls
+                Assert-MockCalled "git" -Times 10 -Exactly;
+            }
+            It("bypass entry without protocoll is provided, it should set http and https"){
+                # arrange
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable "git" {
+                    return;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "codez.one";
+                # act
+                Set-GitProxyConfiguration -Settings $settings;
+                ## set new bypass entries
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "http.http://codez.one.proxy"};
+                Assert-MockCalled "git" -Times 1 -Exactly -ParameterFilter {$args[0] -eq 'config' -and $args[1] -eq "--global" -and $args[2] -eq "https.https://codez.one.proxy"};
+            }
+            it("get version is to old for wildcard, it should warn the user."){
+                # arrange
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable "git" {
+                    if($args[0] -eq "version"){
+                        return "git version 2.0.100"
+                    }
+                    return;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one";
+                # act
+                Set-GitProxyConfiguration -Settings $settings -WarningVariable warning;
+                # assert
+                $warning | Should -Be "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $($settings.BypassList[0])"
+            }
+            ## TODO: add tests if the bypass list isn't clean
         }
     }
 }
