@@ -55,7 +55,7 @@ function Set-GitProxyConfiguration {
         $supportsWildcardHostnames = ((((git version) -split ' ')[2] -split '\.')[0] -ge 2) -and ((((git version) -split ' ')[2] -split '\.')[1] -ge 13);
         # set all new entries
         $Settings.BypassList | ForEach-Object {
-            if ($_ -contains '*' -and $supportsWildcardHostnames -eq $false) {
+            if ($_.Contains('*') -and $supportsWildcardHostnames -eq $false) {
                 Write-Warning "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $_";
             }
             else {
