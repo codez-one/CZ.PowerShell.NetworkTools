@@ -577,4 +577,203 @@ Describe "Set-ProxyConfiguration" {
             }
         }
     }
+    Describe "the docker function" {
+        Context "When Set-DockerProxyConfiguration is okay and" {
+            It("'docker' is undefined, it shouldn't throw an error"){
+                 # arrage
+                 Mock -Verifiable Get-Command {
+                    Write-Error "not found";
+                }
+                #act
+                Set-DockerProxyConfiguration -Settings $null;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "docker"};
+            }
+            It("no config exsists and no proxy are required, do nothing."){
+                 # arrage
+                 Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                #act
+                Set-DockerProxyConfiguration -Settings $null;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly;
+            }
+            It("no config exsists and a proxy is required, write the config."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable New-Item{
+                    return;
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                Set-DockerProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled New-Item -Times 1 -Exactly -ParameterFilter {$ItemType -eq "Directory"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json" -and ($Value | ConvertFrom-Json).proxies.default.httpProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.httpsProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.noProxy -eq ($settings.BypassList -join ',')};
+            }
+            It("config exsists and no proxy is required, reset proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable New-Item{
+                    return;
+                }
+                Mock -Verifiable Get-Content{
+                    return '{
+                        "someProp": "someValue",
+                        "proxies":
+                        {
+                            "default":
+                            {
+                                "httpProxy": "http://old.proxy:80",
+                                "httpsProxy": "http://old.proxy:80",
+                                "noProxy": "old, older"
+                            }
+                        }
+                    }'
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = $null;
+                #act
+                Set-DockerProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json" -and ($Value | ConvertFrom-Json).PsObject.Properties.name -notmatch "proxies" -and ($Value | ConvertFrom-Json).someProp -eq "someValue"};
+            }
+            It("config exsists without proxy config and a proxy is required, set proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable New-Item{
+                    return;
+                }
+                Mock -Verifiable Get-Content{
+                    return '{
+                        "someProp": "someValue"
+                    }'
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-DockerProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json" -and ($Value | ConvertFrom-Json).proxies.default.httpProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.httpsProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.noProxy -eq ($settings.BypassList -join ',') -and ($Value | ConvertFrom-Json).someProp -eq "someValue"};
+            }
+            It("config exsists with proxy config but without default config and a proxy is required, reset proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable New-Item{
+                    return;
+                }
+                Mock -Verifiable Get-Content{
+                    return '{
+                        "someProp": "someValue",
+                        "proxies":
+                        {
+                            "def":
+                            {
+                                "httpProxy": "http://old.proxy:80",
+                                "httpsProxy": "http://old.proxy:80",
+                                "noProxy": "old, older"
+                            }
+                        }
+                    }'
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-DockerProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json" -and ($Value | ConvertFrom-Json).proxies.default.httpProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.httpsProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.noProxy -eq ($settings.BypassList -join ',') -and ($Value | ConvertFrom-Json).someProp -eq "someValue"};
+            }
+            It("config exsists with proxy config and a proxy is required, reset proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable New-Item{
+                    return;
+                }
+                Mock -Verifiable Get-Content{
+                    return '{
+                        "someProp": "someValue",
+                        "proxies":
+                        {
+                            "default":
+                            {
+                                "httpProxy": "http://old.proxy:80",
+                                "httpsProxy": "http://old.proxy:80",
+                                "noProxy": "old, older"
+                            }
+                        }
+                    }'
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-DockerProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "~/.docker/config.json" -and ($Value | ConvertFrom-Json).proxies.default.httpProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.httpsProxy -eq $settings.ProxyAddress -and ($Value | ConvertFrom-Json).proxies.default.noProxy -eq ($settings.BypassList -join ',') -and ($Value | ConvertFrom-Json).someProp -eq "someValue"};
+            }
+        }
+    }
 }
