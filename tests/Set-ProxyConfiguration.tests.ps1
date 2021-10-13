@@ -315,4 +315,266 @@ Describe "Set-ProxyConfiguration" {
             }
         }
     }
+    Describe "the apt function"{
+        Context "When Set-AptProxyConfiguration is okay and" -Skip:($skipBecauseWindows) {
+            It("'apt' is undefined, it shouldn't throw an error"){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    Write-Error "not found";
+                }
+                #act
+                Set-AptProxyConfiguration -Settings $null;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+            }
+            It("no config exsists and no proxy are required, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                #act
+                Set-AptProxyConfiguration -Settings $null;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly;
+            }
+            It("no config exsists and a proxy is required, write the config."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                Set-AptProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Value -eq "Acquire::http::Proxy ""$($settings.ProxyAddress)"";"};
+            }
+            It("no config exsists and a proxy with bypass is required, write a warning that bypass is not support by apt."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                Set-AptProxyConfiguration -Settings $settings -WarningVariable warning;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Value -eq "Acquire::http::Proxy ""$($settings.ProxyAddress)"";"};
+                $warning | Should -Be "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
+            }
+            It("config exsists but is empty and a proxy is required, write the config."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Add-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return $null;
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                Set-AptProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled "apt-config" -Times 1 -Exactly -ParameterFilter {$Args[0] -eq "dump" -and $Args[1] -eq "Acquire::http::proxy"};
+                Assert-MockCalled Add-Content -Times 1 -Exactly -ParameterFilter {$Value -eq "Acquire::http::Proxy ""$($settings.ProxyAddress)"";" -and $Encoding -eq [System.Text.Encoding]::ASCII};
+            }
+            It("config exsists but is empty and a no proxy is required, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Add-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return $null;
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = $null;
+                Set-AptProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled "apt-config" -Times 1 -Exactly -ParameterFilter {$Args[0] -eq "dump" -and $Args[1] -eq "Acquire::http::proxy"};
+                Assert-MockCalled Add-Content -Times 0 -Exactly;
+            }
+            It("config exsists but isn't empty and a no proxy is required, clean up the proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Get-Content {
+                    return "Acquire::http::Proxy ""http://old.proxy:80"";"   + [System.Environment]::NewLine +
+                        "Acquire {"  + [System.Environment]::NewLine +
+                            "http {"  + [System.Environment]::NewLine +
+                                "proxy ""http://old.proxy:80"";"  + [System.Environment]::NewLine +
+                            "}" + [System.Environment]::NewLine +
+                        "}";
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return "something";
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = $null;
+                Set-AptProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled "apt-config" -Times 1 -Exactly -ParameterFilter {$Args[0] -eq "dump" -and $Args[1] -eq "Acquire::http::proxy"};
+                Assert-MockCalled Get-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                $resultAptConf = [System.Environment]::NewLine +
+                    "Acquire {" + [System.Environment]::NewLine +
+                    "http {" + [System.Environment]::NewLine +
+                    [System.Environment]::NewLine +
+                    "}" + [System.Environment]::NewLine +
+                    "}";
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Value -eq $resultAptConf};
+            }
+            It("config exsists and isn't empty and a proxy is required, reset the proxy settings."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Get-Content {
+                    return "Acquire::http::Proxy ""http://old.proxy:80"";"   + [System.Environment]::NewLine +
+                        "Acquire {"  + [System.Environment]::NewLine +
+                            "http {"  + [System.Environment]::NewLine +
+                                "proxy ""http://old.proxy:80"";"  + [System.Environment]::NewLine +
+                            "}" + [System.Environment]::NewLine +
+                        "}";
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return "something";
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                Set-AptProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                Assert-MockCalled "apt-config" -Times 1 -Exactly -ParameterFilter {$Args[0] -eq "dump" -and $Args[1] -eq "Acquire::http::proxy"};
+                Assert-MockCalled Get-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+                $resultAptConf = "Acquire::http::Proxy ""http://proxy.codez.one:8080"";"   +  [System.Environment]::NewLine +
+                    "Acquire {" + [System.Environment]::NewLine +
+                    "http {" + [System.Environment]::NewLine +
+                    "proxy ""http://proxy.codez.one:8080"";"  + [System.Environment]::NewLine +
+                    "}" + [System.Environment]::NewLine +
+                    "}";
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Value -eq $resultAptConf};
+            }
+            It("user aren't root, but know it, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    throw [System.UnauthorizedAccessException] "Your are not root";
+                    return $true;
+                }
+                Mock -Verifiable Get-Content {
+                    return "Acquire::http::Proxy ""http://old.proxy:80"";"   + [System.Environment]::NewLine +
+                        "Acquire {"  + [System.Environment]::NewLine +
+                            "http {"  + [System.Environment]::NewLine +
+                                "proxy ""http://old.proxy:80"";"  + [System.Environment]::NewLine +
+                            "}" + [System.Environment]::NewLine +
+                        "}";
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return "something";
+                }
+                #act
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                Set-AptProxyConfiguration -Settings $settings -NoRoot;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+            }
+            It("user aren't root, but don't know it, show an error."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return "not null";
+                }
+                Mock -Verifiable Test-Path {
+                    throw [System.UnauthorizedAccessException] "Your are not root";
+                    return $true;
+                }
+                Mock -Verifiable Get-Content {
+                    return "Acquire::http::Proxy ""http://old.proxy:80"";"   + [System.Environment]::NewLine +
+                        "Acquire {"  + [System.Environment]::NewLine +
+                            "http {"  + [System.Environment]::NewLine +
+                                "proxy ""http://old.proxy:80"";"  + [System.Environment]::NewLine +
+                            "}" + [System.Environment]::NewLine +
+                        "}";
+                }
+                Mock -Verifiable Set-Content {
+                    return;
+                }
+                Mock -Verifiable "apt-config" {
+                    return "something";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+
+                #act & assert
+                {Set-AptProxyConfiguration -Settings $settings} | Should -Throw "You must be root to change APT settings.";
+                Assert-MockCalled Get-Command -Times 1 -Exactly;
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
+            }
+        }
+    }
 }
