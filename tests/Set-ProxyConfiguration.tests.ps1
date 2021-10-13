@@ -133,7 +133,7 @@ Describe "Set-ProxyConfiguration" {
                 Assert-MockCalled Get-Command -Times 1 -ParameterFilter {$Name -eq "git"};
                 Assert-MockCalled "git" -Exactly -Times 0;
             }
-            It("if no proxy should be setted, the proxy should be unset."){
+            It("no proxy should be setted, the proxy should be unset."){
                 Mock -Verifiable Get-Command {
                     return "not null";
                 }
@@ -241,7 +241,7 @@ Describe "Set-ProxyConfiguration" {
                 # assert
                 $warning | Should -Be "Your git version is to old to support wild card hostnames. You must have version 2.13 or higher. We skip the hostname $($settings.BypassList[0])"
             }
-            ## TODO: add tests if the bypass list isn't clean
         }
+        ## TODO: add tests if the bypass list isn't clean
     }
 }
