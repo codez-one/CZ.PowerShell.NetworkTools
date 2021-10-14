@@ -35,6 +35,7 @@ jobs:
           testResultsFiles: 'testResults.xml'
           failTaskOnFailedTests: true
           testRunTitle: 'CZ.PowerShell.NetworkTools'
+          mergeTestResults: true
       - task: PublishBuildArtifacts@1
         condition: always()
         inputs:
@@ -69,6 +70,7 @@ jobs:
           testResultsFiles: 'testResults.xml'
           failTaskOnFailedTests: true
           testRunTitle: 'CZ.PowerShell.NetworkTools'
+          mergeTestResults: true
       - task: PublishBuildArtifacts@1
         condition: always()
         inputs:
@@ -114,7 +116,6 @@ jobs:
         condition: always()
         inputs:
           codeCoverageTool: 'JaCoCo'
-          summaryFileLocation: 'windows-coverage/coverage.xml'
-          additionalCodeCoverageFiles: 'linux-coverage/coverage.xml'
+          summaryFileLocation: '$(System.DefaultWorkingDirectory)/*-coverage/coverage.xml'
           pathToSources: 'src/'
           failIfCoverageEmpty: true
