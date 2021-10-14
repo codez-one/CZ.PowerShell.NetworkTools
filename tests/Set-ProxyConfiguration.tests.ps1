@@ -776,4 +776,312 @@ Describe "Set-ProxyConfiguration" {
             }
         }
     }
+    Describe "the powershell function" {
+        Context "When Set-PowerShellProxyConfiguration is okay and"  -Skip:($skipBecauseWindows){
+            It("user aren't root, but know it, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                }
+                Mock -Verifiable Test-Path {
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings -NoRoot;
+                # assert
+                Assert-MockCalled Get-Command -Times 0 -Exactly;
+                Assert-MockCalled Test-Path -Times 0 -Exactly;
+            }
+            It("'pwsh' and 'powershell' isn't there, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    Write-Error "not found";
+                }
+                Mock -Verifiable Test-Path {
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 0 -Exactly;
+            }
+            It("no config exsists and no proxy are required, do nothing."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config"};
+            }
+            It("no config exsists and a proxy is required, write the config."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return $null;
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "something.config"};
+                Assert-MockCalled New-Item -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config"};
+                Assert-MockCalled Set-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist -eq $null};
+
+            }
+            It("a proxy and a bypasslist is required, write both to the config."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return $null;
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "something.config"};
+                Assert-MockCalled New-Item -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config"};
+                Assert-MockCalled Set-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[0].address -eq $settings.BypassList[0] -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[1].address -eq $settings.BypassList[1]};
+            }
+            It("config is already exsists but is empty a proxy and a bypasslist is required, write both to the config"){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    # use testdrive here, because the XML function save will use it.
+                    return [pscustomobject]@{Path = "$TestDrive/something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return '';
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled New-Item -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[0].address -eq $settings.BypassList[0] -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[1].address -eq $settings.BypassList[1]};
+            }
+            It("config is already used a proxy and a bypasslist is required, write both to the config, without destroying exsisting configuration."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    # use testdrive here, because the XML function save will use it.
+                    return [pscustomobject]@{Path = "$TestDrive/something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return '<configuration>
+                        <someconfig>testvalue</someconfig>
+                    </configuration>';
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled New-Item -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[0].address -eq $settings.BypassList[0] -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[1].address -eq $settings.BypassList[1]};
+                ([xml](Get-Content TestDrive:/something.config)).configuration.someconfig | Should -Be "testvalue";
+            }
+            It("config is already used a proxy and a bypasslist is required, write both to the config, without destroying exsisting configuration.system.net."){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    # use testdrive here, because the XML function save will use it.
+                    return [pscustomobject]@{Path = "$TestDrive/something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return '<configuration>
+                        <system.net>
+                            <someconfig>testvalue</someconfig>
+                        </system.net>
+                    </configuration>';
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled New-Item -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[0].address -eq $settings.BypassList[0] -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[1].address -eq $settings.BypassList[1]};
+                ([xml](Get-Content TestDrive:/something.config)).configuration["system.net"].someconfig | Should -Be "testvalue";
+            }
+            It("config had alread proxy, but enother proxy and bypasslist is required, write both to the config, and remove the old one"){
+                # arrage
+                Mock -Verifiable Get-Command {
+                    # use testdrive here, because the XML function save will use it.
+                    return [pscustomobject]@{Path = "$TestDrive/something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Content {
+                    return '<configuration>
+                        <system.net>
+                            <defaultProxy>
+                            <proxy
+                                usesystemdefault="true"
+                                proxyaddress="http://old.proxy:80"
+                                bypassonlocal="true"
+                            />
+                            <bypasslist>
+                                <add address="old" />
+                            </bypasslist>
+                        </defaultProxy>
+                        </system.net>
+                    </configuration>';
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                $settings.BypassList = "*.codez.one", "codez.one";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled New-Item -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled Set-Content -Times 0 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[0].address -eq $settings.BypassList[0] -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist.add[1].address -eq $settings.BypassList[1]};
+            }
+        }
+        Context "When Set-PowerShellProxyConfiguration is running in Windows and" -Skip:($skipBecauseLinux) {
+            It("no config exsists and a proxy is required, write the config."){
+                # arrage
+                $defaultAcl = (New-Object System.Security.AccessControl.DirectorySecurity);
+                Mock -Verifiable Get-Command {
+                    return [pscustomobject]@{Path = "$TestDrive/something"};
+                }
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable New-Item {
+                    return;
+                }
+                Mock -Verifiable Get-Item {
+                    return ([pscustomobject]@{
+                        Directory = [pscustomobject]@{
+                            FullName = "$TestDrive"
+                        }
+                    });
+                }
+                Mock -Verifiable Get-Content {
+                    return $null;
+                }
+                Mock -Verifiable Set-Content {
+                    return "";
+                }
+                Mock -Verifiable Get-Acl {
+                    return $defaultAcl;
+                }
+                Mock -Verifiable Set-Acl {
+                    return;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-PowerShellProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "pwsh"};
+                Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter {$Name -eq "powershell"};
+                Assert-MockCalled Test-Path -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled New-Item -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $ItemType -eq "File"};
+                Assert-MockCalled Get-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config"};
+                Assert-MockCalled Set-Content -Times 2 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and ([xml]$Value).configuration["system.net"].defaultProxy.proxy.proxyaddress -eq $settings.ProxyAddress -and ([xml]$Value).configuration["system.net"].defaultProxy.bypasslist -eq $null};
+
+                ## make sure to set and reset folder acl
+                Assert-MockCalled Set-Acl -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive" -and $AclObject.Access.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq "S-1-5-32-544" -and $AclObject.Access.AccessControlType -eq "Allow"};
+                Assert-MockCalled Set-Acl -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive" -and $AclObject -eq $defaultAcl};
+
+                ## make sure to set and reset file acl
+                Assert-MockCalled Set-Acl -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $AclObject.Access.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq "S-1-5-32-544" -and $AclObject.Access.AccessControlType -eq "Allow"};
+                Assert-MockCalled Set-Acl -Times 4 -Exactly -ParameterFilter {$Path -eq "$TestDrive/something.config" -and $AclObject -eq $defaultAcl};
+            }
+        }
+    }
 }
