@@ -28,19 +28,19 @@ jobs:
             Invoke-Pester -Configuration $configuration;
           showWarnings: true
           pwsh: true
-      - task: PublishTestResults@2
-        condition: always()
-        inputs:
-          testResultsFormat: 'NUnit'
-          testResultsFiles: 'testResults.xml'
-          failTaskOnFailedTests: true
-          testRunTitle: 'CZ.PowerShell.NetworkTools'
-          mergeTestResults: true
       - task: PublishBuildArtifacts@1
+        displayName: 'Publish Coverage'
         condition: always()
         inputs:
             PathtoPublish: 'coverage.xml'
             ArtifactName: 'windows-coverage'
+            publishLocation: Container
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Tests'
+        condition: always()
+        inputs:
+            PathtoPublish: 'testResults.xml'
+            ArtifactName: 'windows-tests'
             publishLocation: Container
   - job: 'linux_test'
     pool:
@@ -63,19 +63,19 @@ jobs:
             Invoke-Pester -Configuration $configuration;
           showWarnings: true
           pwsh: true
-      - task: PublishTestResults@2
-        condition: always()
-        inputs:
-          testResultsFormat: 'NUnit'
-          testResultsFiles: 'testResults.xml'
-          failTaskOnFailedTests: true
-          testRunTitle: 'CZ.PowerShell.NetworkTools'
-          mergeTestResults: true
       - task: PublishBuildArtifacts@1
+        displayName: 'Publish Coverage'
         condition: always()
         inputs:
             PathtoPublish: 'coverage.xml'
             ArtifactName: 'linux-coverage'
+            publishLocation: Container
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Tests'
+        condition: always()
+        inputs:
+            PathtoPublish: 'testResults.xml'
+            ArtifactName: 'linux-tests'
             publishLocation: Container
   - job: 'build_package'
     pool:
@@ -95,7 +95,7 @@ jobs:
             PathtoPublish: 'src/bin/'
             ArtifactName: 'drop'
             publishLocation: 'Container'
-  - job: 'publish_coverage'
+  - job: 'publish_coverage_and_tests'
     pool:
       vmImage: windows-latest
     dependsOn:
@@ -112,6 +112,16 @@ jobs:
         inputs:
           artifactName: linux-coverage
           downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@0
+        displayName: 'Download Tests Windows Artifacts'
+        inputs:
+          artifactName: windows-tests
+          downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@0
+        displayName: 'Download Tests Linux Artifacts'
+        inputs:
+          artifactName: linux-tests
+          downloadPath: $(System.DefaultWorkingDirectory)/
       - task: PublishCodeCoverageResults@1
         condition: always()
         inputs:
@@ -119,3 +129,11 @@ jobs:
           summaryFileLocation: '$(System.DefaultWorkingDirectory)/*-coverage/coverage.xml'
           pathToSources: 'src/'
           failIfCoverageEmpty: true
+      - task: PublishTestResults@2
+        condition: always()
+        inputs:
+          testResultsFormat: 'NUnit'
+          testResultsFiles: '$(System.DefaultWorkingDirectory)/*-tests/testResults.xml'
+          failTaskOnFailedTests: true
+          testRunTitle: 'CZ.PowerShell.NetworkTools'
+          mergeTestResults: true
