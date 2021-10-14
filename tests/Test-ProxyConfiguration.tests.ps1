@@ -1,9 +1,11 @@
 Describe "Test-ProxyConfiguration" {
     BeforeAll {
-        $fileInfo = Get-ChildItem $PSScriptRoot;
+        $fileInfo = Get-ChildItem $PSCommandPath;
         $functionName = $fileInfo.Name.Split('.')[0];
+        $file = Get-ChildItem "$PSScriptRoot/../src/$functionName.ps1";
+        $targetFileName = "$($file.FullName)";
         # load function to test
-        . "$PSScriptRoot/../src/$functionName.ps1";
+        . "$targetFileName";
     }
     Context "When Test-Connection is okay and" {
         BeforeEach {
@@ -159,10 +161,12 @@ Describe "Test-ProxyConfiguration" {
 }
 Describe "ProxyTestResult" {
     BeforeAll {
-        $fileInfo = Get-ChildItem $PSScriptRoot;
+        $fileInfo = Get-ChildItem $PSCommandPath;
         $functionName = $fileInfo.Name.Split('.')[0];
+        $file = Get-ChildItem "$PSScriptRoot/../src/$functionName.ps1";
+        $targetFileName = "$($file.FullName)";
         # load function to test
-        . "$PSScriptRoot/../src/$functionName.ps1";
+        . "$targetFileName";
     }
     Context 'everthing is perfect' {
         It 'It should print a good message, if the bypass list is used correct.' {

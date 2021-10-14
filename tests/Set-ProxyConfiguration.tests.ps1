@@ -2,10 +2,13 @@ Describe "Set-ProxyConfiguration" {
     $skipBecauseLinux = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $false;
     $skipBecauseWindows = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $true;
     BeforeAll {
-        $fileInfo = Get-ChildItem $PSScriptRoot;
-        $functionName = $fileInfo.Name.Split('.')[0];
         # load function to test
-        . "$PSScriptRoot/../src/$functionName.ps1";
+        $fileInfo = Get-ChildItem $PSCommandPath;
+        $functionName = $fileInfo.Name.Split('.')[0];
+        $file = Get-ChildItem "$PSScriptRoot/../src/$functionName.ps1";
+        $targetFileName = "$($file.FullName)";
+        # load function to test
+        . "$targetFileName";
     }
     Describe "the main function" {
 
@@ -1118,9 +1121,10 @@ Describe "Set-ProxyConfiguration" {
                 $settings = [ProxySetting](New-Object ProxySetting);
                 $settings.ProxyAddress = "http://proxy.codez.one:8080";
                 #act
+                Write-Warning "start";
                 Set-EnvironmentProxyConfiguration -Settings $settings;
                 # assert
-                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh" -and ([string]$Value).Contains("export http_proxy=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export https_proxy=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export no_proxy=`"$($Settings.BypassList -join ',')`"") -and ([string]$Value).Contains("export HTTPS_PROXY=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export HTTP_PROXY=`"$($settings.ProxyAddress)`"")};
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh" -and ([string]$Value).Contains("export http_proxy=$($settings.ProxyAddress)") -and ([string]$Value).Contains("export https_proxy=$($settings.ProxyAddress)") -and ([string]$Value).Contains("export no_proxy=$($Settings.BypassList -join ',')") -and ([string]$Value).Contains("export HTTPS_PROXY=$($settings.ProxyAddress)") -and ([string]$Value).Contains("export HTTP_PROXY=$($settings.ProxyAddress)")};
             }
             It("no proxy is required but config exsists, remove it."){
                 # arrage
