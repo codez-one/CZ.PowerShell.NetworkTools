@@ -275,6 +275,14 @@ function Set-PowerShellProxyConfiguration {
         Write-Verbose "You can't set a proxy for powershell 5 / 7 without admin / root rights. On Windows try to set IE Settings if this is possible.";
         return;
     }
+    if ($Settings.BypassList -ne $null -and $Settings.BypassList.Count -gt 0) {
+        $bypasslist = '<bypasslist>
+            '+ (
+                (($Settings.BypassList | ForEach-Object { "<add address=`"$_`" /> " }) -join [System.Environment]::NewLine)
+        ) + '
+            </bypasslist>';
+    }
+
     $proxyConfig = '<configuration>
         <system.net>
             <defaultProxy>
@@ -283,11 +291,7 @@ function Set-PowerShellProxyConfiguration {
                 proxyaddress="'+ $Settings.ProxyAddress + '"
                 bypassonlocal="true"
             />
-            <bypasslist>
-                '+ (
-        (($Settings.BypassList | ForEach-Object { "<add address=`"$_`" /> " }) -join [System.Environment]::NewLine)
-    ) + '
-            </bypasslist>
+            '+ $bypasslist + '
             </defaultProxy>
         </system.net>
     </configuration>';
@@ -302,6 +306,11 @@ function Set-PowerShellProxyConfiguration {
         )
 
         $configPath = "$powershellPath.config";
+        if ((Test-Path $configPath) -eq $false -and [string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
+            # do nothing, if the config isn't exsist and no proxy is required.
+            return
+        }
+        #create file if it isn't exsists
         if ((Test-Path $configPath) -eq $false) {
             # set acls for windows
             if ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) {
@@ -427,14 +436,14 @@ function Set-EnvironmentProxyConfiguration {
             # Set environment for all users
             $proxyshFilePath = "/etc/profile.d/proxy.sh";
             if ([string]::IsNullOrWhiteSpace($Settings.ProxyAddress)) {
-            # Remove this content from the file, because a line with:
-            # `something=`
-            # is an error for some tools. So the lines must be empty
-                if(Test-Path -Path $proxyshFilePath){
+                # Remove this content from the file, because a line with:
+                # `something=`
+                # is an error for some tools. So the lines must be empty
+                if (Test-Path -Path $proxyshFilePath) {
                     Remove-Item -Path "/etc/profile.d/proxy.sh" -Force;
                     Write-Verbose "$proxyshFilePath deleted. Proxy settings are resetted.";
                 }
-                else{
+                else {
                     Write-Verbose "$proxyshFilePath didn't exsist. Nothing changed.";
                 }
 
