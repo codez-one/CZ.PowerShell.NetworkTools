@@ -35,13 +35,12 @@ jobs:
           testResultsFiles: 'testResults.xml'
           failTaskOnFailedTests: true
           testRunTitle: 'CZ.PowerShell.NetworkTools'
-      - task: PublishCodeCoverageResults@1
+      - task: PublishBuildArtifacts@1
         condition: always()
         inputs:
-          codeCoverageTool: 'JaCoCo'
-          summaryFileLocation: 'coverage.xml'
-          pathToSources: 'src/'
-          failIfCoverageEmpty: true
+            PathtoPublish: 'coverage.xml'
+            ArtifactName: 'windows-coverage'
+            publishLocation: Container
   - job: 'linux_test'
     pool:
       vmImage: 'ubuntu-latest'
@@ -70,16 +69,18 @@ jobs:
           testResultsFiles: 'testResults.xml'
           failTaskOnFailedTests: true
           testRunTitle: 'CZ.PowerShell.NetworkTools'
-      - task: PublishCodeCoverageResults@1
+      - task: PublishBuildArtifacts@1
         condition: always()
         inputs:
-          codeCoverageTool: 'JaCoCo'
-          summaryFileLocation: 'coverage.xml'
-          pathToSources: 'src/'
-          failIfCoverageEmpty: true
+            PathtoPublish: 'coverage.xml'
+            ArtifactName: 'linux-coverage'
+            publishLocation: Container
   - job: 'build_package'
     pool:
       vmImage: windows-latest
+    dependsOn:
+      - 'windows_test'
+      - 'linux_test'
     steps:
       - task: PowerShell@2
         displayName: "Build the powershell package"
@@ -92,3 +93,28 @@ jobs:
             PathtoPublish: 'src/bin/'
             ArtifactName: 'drop'
             publishLocation: 'Container'
+  - job: 'publish_coverage'
+    pool:
+      vmImage: windows-latest
+    dependsOn:
+      - 'windows_test'
+      - 'linux_test'
+    steps:
+      - task: DownloadBuildArtifacts@0
+        displayName: 'Download Coverage Windows Artifacts'
+        inputs:
+          artifactName: windows-coverage
+          downloadPath: $(System.DefaultWorkingDirectory)/windows/
+      - task: DownloadBuildArtifacts@0
+        displayName: 'Download Coverage Linux Artifacts'
+        inputs:
+          artifactName: linux-coverage
+          downloadPath: $(System.DefaultWorkingDirectory)/linux/
+      - task: PublishCodeCoverageResults@1
+        condition: always()
+        inputs:
+          codeCoverageTool: 'JaCoCo'
+          summaryFileLocation: 'windows/coverage.xml'
+          additionalCodeCoverageFiles: 'linux/coverage.xml'
+          pathToSources: 'src/'
+          failIfCoverageEmpty: true
