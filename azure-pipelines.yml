@@ -104,17 +104,17 @@ jobs:
         displayName: 'Download Coverage Windows Artifacts'
         inputs:
           artifactName: windows-coverage
-          downloadPath: $(System.DefaultWorkingDirectory)/windows/
+          downloadPath: $(System.DefaultWorkingDirectory)/
       - task: DownloadBuildArtifacts@0
         displayName: 'Download Coverage Linux Artifacts'
         inputs:
           artifactName: linux-coverage
-          downloadPath: $(System.DefaultWorkingDirectory)/linux/
+          downloadPath: $(System.DefaultWorkingDirectory)/
       - task: PublishCodeCoverageResults@1
         condition: always()
         inputs:
           codeCoverageTool: 'JaCoCo'
-          summaryFileLocation: 'windows/coverage.xml'
-          additionalCodeCoverageFiles: 'linux/coverage.xml'
+          summaryFileLocation: 'windows-coverage/coverage.xml'
+          additionalCodeCoverageFiles: 'linux-coverage/coverage.xml'
           pathToSources: 'src/'
           failIfCoverageEmpty: true
