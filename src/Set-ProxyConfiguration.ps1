@@ -449,8 +449,8 @@ function Set-EnvironmentProxyConfiguration {
 
             }
             else {
-                "export http_proxy=`"$($Settings.ProxyAddress)`"
-                export no_proxy=`"$($Settings.BypassList -join ',')`"
+                "export http_proxy=$($Settings.ProxyAddress)
+                export no_proxy=$($Settings.BypassList -join ',')
                 export HTTP_PROXY=$($Settings.ProxyAddress)
                 export https_proxy=$($Settings.ProxyAddress)
                 export HTTPS_PROXY=$($Settings.ProxyAddress)" | Set-Content -Path $proxyshFilePath;
