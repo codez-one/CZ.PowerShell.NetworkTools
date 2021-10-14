@@ -1084,4 +1084,62 @@ Describe "Set-ProxyConfiguration" {
             }
         }
     }
+    Describe "the environment function" {
+        Context "When Set-EnvironmentProxyConfiguration is okay and"  -Skip:($skipBecauseWindows){
+            It("user aren't root, but know it, do nothing."){
+                # arrage
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-EnvironmentProxyConfiguration -Settings $settings -NoRoot -WarningVariable warning;
+                # assert
+                $warning | Should -Be "Currently to set the environment this script needs root rights. Didn't change any environment varables.";
+            }
+            It("no config exsists and no proxy are required, do nothing."){
+                # arrage
+                Mock -Verifiable Test-Path {
+                    return $false;
+                }
+                Mock -Verifiable Remove-Item {
+                    return $false;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                #act
+                Set-EnvironmentProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh"};
+                Assert-MockCalled Remove-Item -Times 0 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh"};
+            }
+            It("a proxy is required, write the config."){
+                # arrage
+                Mock -Verifiable Set-Content {
+                    return ;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                $settings.ProxyAddress = "http://proxy.codez.one:8080";
+                #act
+                Set-EnvironmentProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh" -and ([string]$Value).Contains("export http_proxy=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export https_proxy=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export no_proxy=`"$($Settings.BypassList -join ',')`"") -and ([string]$Value).Contains("export HTTPS_PROXY=`"$($settings.ProxyAddress)`"") -and ([string]$Value).Contains("export HTTP_PROXY=`"$($settings.ProxyAddress)`"")};
+            }
+            It("no proxy is required but config exsists, remove it."){
+                # arrage
+                Mock -Verifiable Test-Path {
+                    return $true;
+                }
+                Mock -Verifiable Remove-Item {
+                    return;
+                }
+                $settings = [ProxySetting](New-Object ProxySetting);
+                #act
+                Set-EnvironmentProxyConfiguration -Settings $settings;
+                # assert
+                Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh"};
+                Assert-MockCalled Remove-Item -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/profile.d/proxy.sh"};
+            }
+        }
+        Context "When Set-PowerShellProxyConfiguration is running in Windows and" -Skip:($skipBecauseLinux) {
+           # TODO: Can't test static dotnet calls. Needs a solution for this.
+        }
+    }
 }
