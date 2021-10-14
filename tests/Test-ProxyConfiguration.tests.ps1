@@ -1,4 +1,6 @@
-Describe "Test-ProxyConfiguration" {
+$skipBecauseLinux = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $false;
+$skipBecauseWindows = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $true;
+Describe "Test-ProxyConfiguration" -Skip:($skipBecauseLinux) {
     BeforeAll {
         $fileInfo = Get-ChildItem $PSCommandPath;
         $functionName = $fileInfo.Name.Split('.')[0];
@@ -159,7 +161,7 @@ Describe "Test-ProxyConfiguration" {
     }
 
 }
-Describe "ProxyTestResult" {
+Describe "ProxyTestResult" -Skip:($skipBecauseLinux)  {
     BeforeAll {
         $fileInfo = Get-ChildItem $PSCommandPath;
         $functionName = $fileInfo.Name.Split('.')[0];
