@@ -1,6 +1,7 @@
 Describe "Set-ProxyConfiguration" {
     $skipBecauseLinux = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $false;
     $skipBecauseWindows = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $true;
+    $noapt = ($null -eq (Get-Command apt -ErrorAction SilentlyContinue));
     BeforeAll {
         # load function to test
         $fileInfo = Get-ChildItem $PSCommandPath;
@@ -319,7 +320,7 @@ Describe "Set-ProxyConfiguration" {
         }
     }
     Describe "the apt function"{
-        Context "When Set-AptProxyConfiguration is okay and" -Skip:(($skipBecauseWindows) -or ($null -eq (Get-Command apt -ErrorAction SilentlyContinue))){
+        Context "When Set-AptProxyConfiguration is okay and" -Skip:(($skipBecauseWindows) -or ($noapt)){
             It("'apt' is undefined, it shouldn't throw an error"){
                 # arrage
                 Mock -Verifiable Get-Command {
