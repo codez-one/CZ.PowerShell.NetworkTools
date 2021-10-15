@@ -199,7 +199,7 @@ function Set-AptProxyConfiguration {
     }
     catch [System.UnauthorizedAccessException] {
         if ($NoRoot) {
-            Write-Debug "Skip APT configuration because NORoot.";
+            Write-Debug "Skip APT configuration because NORoot Option is set.";
             return;
         }
         else {
