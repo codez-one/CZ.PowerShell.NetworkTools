@@ -54,8 +54,7 @@ jobs:
     pool:
       vmImage: windows-latest
     dependsOn:
-      - 'windows_test'
-      - 'linux_test'
+      - 'tests'
     steps:
       - task: PowerShell@2
         displayName: "Build the powershell package"
