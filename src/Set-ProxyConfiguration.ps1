@@ -194,7 +194,7 @@ function Set-AptProxyConfiguration {
             }
         }
         if ($null -ne $Settings.BypassList -and $Settings.BypassList.Count -ne 0) {
-            Write-Warning "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
+            Write-Warning "apt-get does not support bypass list. To bypass the proxy config for a given command start the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
         }
     }
     catch [System.UnauthorizedAccessException] {
