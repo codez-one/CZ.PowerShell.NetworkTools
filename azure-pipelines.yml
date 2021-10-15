@@ -73,30 +73,35 @@ jobs:
     dependsOn:
       - 'tests'
     steps:
-      - task: DownloadBuildArtifacts@0
-        displayName: 'Download Coverage Windows Artifacts'
-        inputs:
-          artifactName: windows-coverage
-          downloadPath: $(System.DefaultWorkingDirectory)/
-      - task: DownloadBuildArtifacts@0
-        displayName: 'Download Coverage Linux Artifacts'
-        inputs:
-          artifactName: linux-coverage
-          downloadPath: $(System.DefaultWorkingDirectory)/
-      - task: DownloadBuildArtifacts@0
-        displayName: 'Download Tests Windows Artifacts'
-        inputs:
-          artifactName: windows-tests
-          downloadPath: $(System.DefaultWorkingDirectory)/
-      - task: DownloadBuildArtifacts@0
-        displayName: 'Download Tests Linux Artifacts'
-        inputs:
-          artifactName: linux-tests
-          downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Coverage Windows Artifacts'
+      #   inputs:
+      #     artifactName: windows-coverage
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Coverage Linux Artifacts'
+      #   inputs:
+      #     artifactName: linux-coverage
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Tests Windows Artifacts'
+      #   inputs:
+      #     artifactName: windows-tests
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Tests Linux Artifacts'
+      #   inputs:
+      #     artifactName: linux-tests
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
       - task: DownloadBuildArtifacts@1
         displayName: 'Download All Tests Artifacts'
         inputs:
           artifactName: '*-tests'
+          downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@1
+        displayName: 'Download All Coverage Artifacts'
+        inputs:
+          artifactName: '*-coverage'
           downloadPath: $(System.DefaultWorkingDirectory)/
       - task: PublishCodeCoverageResults@1
         condition: always()
