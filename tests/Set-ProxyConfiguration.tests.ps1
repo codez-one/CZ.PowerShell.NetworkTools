@@ -115,7 +115,7 @@ Describe "Set-ProxyConfiguration" {
                 }
                 $configPath = "something/that/not/exsists";
                 # Act & assert
-                { Set-ProxyConfiguration -ConfigPath "$configPath" } | Should -Throw "Currently we don't support linux, to read out the system proxy. Please configure it manualy";
+                { Set-ProxyConfiguration -ConfigPath "$configPath" } | Should -Throw "Currently we don't support linux, to read out the system proxy. Please configure it manually";
                 Assert-MockCalled Test-Path -Times 1 -ParameterFilter { $Path -eq $configPath };
                 Assert-MockCalled Get-Content -Times 1 -ParameterFilter { $Path -eq $configPath -and $Raw -eq $true };
             }
