@@ -1,7 +1,9 @@
 Describe "Set-ProxyConfiguration" {
-    $skipBecauseLinux = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $false;
-    $skipBecauseWindows = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $true;
-    $noapt = ($null -eq (Get-Command apt -ErrorAction SilentlyContinue));
+    BeforeDiscovery {
+        $script:skipBecauseLinux = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $false;
+        $script:skipBecauseWindows = ($PSVersionTable.PSEdition -eq "Desktop" -or $IsWindows) -eq $true;
+        $script:noapt = ($null -eq (Get-Command apt -ErrorAction SilentlyContinue) -or $null -eq (Get-Command apt-config -ErrorAction SilentlyContinue));
+    }
     BeforeAll {
         # load function to test
         $fileInfo = Get-ChildItem $PSCommandPath;
