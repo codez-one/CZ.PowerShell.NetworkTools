@@ -115,7 +115,7 @@ Describe "Set-ProxyConfiguration" {
                 }
                 $configPath = "something/that/not/exsists";
                 # Act & assert
-                { Set-ProxyConfiguration -ConfigPath "$configPath" } | Should -Throw "Currently we don't support linux, to read out the system proxy. Please configure it manually";
+                { Set-ProxyConfiguration -ConfigPath "$configPath" } | Should -Throw "Currently we don't support linux, to read out the system proxy. Please configure it manualy";
                 Assert-MockCalled Test-Path -Times 1 -ParameterFilter { $Path -eq $configPath };
                 Assert-MockCalled Get-Content -Times 1 -ParameterFilter { $Path -eq $configPath -and $Raw -eq $true };
             }
@@ -388,7 +388,7 @@ Describe "Set-ProxyConfiguration" {
                 Assert-MockCalled Get-Command -Times 1 -Exactly;
                 Assert-MockCalled Test-Path -Times 1 -Exactly -ParameterFilter {$Path -eq "/etc/apt/apt.conf"};
                 Assert-MockCalled Set-Content -Times 1 -Exactly -ParameterFilter {$Value -eq "Acquire::http::Proxy ""$($settings.ProxyAddress)"";"};
-                $warning | Should -Be "apt-get don't support bypass list. To bypassing the proxy config for a given command starts the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
+                $warning | Should -Be "apt-get does not support bypass list. To bypass the proxy config for a given command start the command like: 'apt-get -o Acquire::http::proxy=false ....'. This will bypass the proxy for the runtime of the apt-get command.";
             }
             It("config exsists but is empty and a proxy is required, write the config."){
                 # arrage
