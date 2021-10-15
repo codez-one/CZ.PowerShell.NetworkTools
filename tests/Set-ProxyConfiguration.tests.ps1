@@ -319,7 +319,7 @@ Describe "Set-ProxyConfiguration" {
         }
     }
     Describe "the apt function"{
-        Context "When Set-AptProxyConfiguration is okay and" -Skip:($skipBecauseWindows) {
+        Context "When Set-AptProxyConfiguration is okay and" -Skip:($skipBecauseWindows -or (Get-Command apt -ErrorAction SilentlyContinue) -eq $null){
             It("'apt' is undefined, it shouldn't throw an error"){
                 # arrage
                 Mock -Verifiable Get-Command {
