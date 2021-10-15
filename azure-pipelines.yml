@@ -7,9 +7,17 @@ trigger:
 - main
 
 jobs:
-  - job: 'windows_test'
+  - job: 'tests'
+    strategy:
+      matrix:
+        linux:
+          imageName: 'ubuntu-latest'
+        mac:
+          imageName: 'macOS-latest'
+        windows:
+          imageName: 'windows-latest'
     pool:
-      vmImage: windows-latest
+      vmImage: $(imageName)
     steps:
       - task: PowerShell@2
         displayName: "Run pester tests"
@@ -33,49 +41,14 @@ jobs:
         condition: always()
         inputs:
             PathtoPublish: 'coverage.xml'
-            ArtifactName: 'windows-coverage'
+            ArtifactName: '$(imageName)-coverage'
             publishLocation: Container
       - task: PublishBuildArtifacts@1
         displayName: 'Publish Tests'
         condition: always()
         inputs:
             PathtoPublish: 'testResults.xml'
-            ArtifactName: 'windows-tests'
-            publishLocation: Container
-  - job: 'linux_test'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-      - task: PowerShell@2
-        displayName: "Run pester tests"
-        inputs:
-          targetType: 'inline'
-          script: |
-            Install-Module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck Pester;
-            Import-Module Pester;
-            $configuration = [PesterConfiguration]::Default;
-            $configuration.CodeCoverage.Enabled = $true;
-            $configuration.CodeCoverage.Path = (Get-ChildItem src/*.ps1 | ForEach-Object{$_.FullName});
-            $configuration.CodeCoverage.OutputFormat = "JaCoCo";
-            $configuration.TestResult.Enabled = $true;
-            $configuration.Run.Exit = $true;
-            $configuration.Run.Path = (Get-ChildItem tests/*ps1 | ForEach-Object{$_.FullName});
-            Invoke-Pester -Configuration $configuration;
-          showWarnings: true
-          pwsh: true
-      - task: PublishBuildArtifacts@1
-        displayName: 'Publish Coverage'
-        condition: always()
-        inputs:
-            PathtoPublish: 'coverage.xml'
-            ArtifactName: 'linux-coverage'
-            publishLocation: Container
-      - task: PublishBuildArtifacts@1
-        displayName: 'Publish Tests'
-        condition: always()
-        inputs:
-            PathtoPublish: 'testResults.xml'
-            ArtifactName: 'linux-tests'
+            ArtifactName: '$(imageName)-tests'
             publishLocation: Container
   - job: 'build_package'
     pool:
@@ -99,8 +72,7 @@ jobs:
     pool:
       vmImage: windows-latest
     dependsOn:
-      - 'windows_test'
-      - 'linux_test'
+      - 'tests'
     steps:
       - task: DownloadBuildArtifacts@0
         displayName: 'Download Coverage Windows Artifacts'
@@ -121,6 +93,11 @@ jobs:
         displayName: 'Download Tests Linux Artifacts'
         inputs:
           artifactName: linux-tests
+          downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@1
+        displayName: 'Download All Tests Artifacts'
+        inputs:
+          artifactName: '*-tests'
           downloadPath: $(System.DefaultWorkingDirectory)/
       - task: PublishCodeCoverageResults@1
         condition: always()
