@@ -12,7 +12,7 @@
 RootModule = '.\CZ.PowerShell.NetworkTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.0.1'
+ModuleVersion = '0.0.2'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Desktop', 'Core'
@@ -30,7 +30,7 @@ CompanyName = 'CodeZ.one'
 Copyright = 'Copyright (c) 2021 CodeZ.one'
 
 # Description of the functionality provided by this module
-Description = 'Provide some simple powershell functions, to debug your network configuration.'
+Description = 'Provide some simple powershell functions, to debug and change your network configuration.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
