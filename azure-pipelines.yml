@@ -6,55 +6,117 @@
 trigger:
 - main
 
-pool:
-  vmImage: windows-latest
-
-steps:
-- task: PowerShell@2
-  displayName: "Run pester tests"
-  inputs:
-    targetType: 'inline'
-    script: |
-      Install-Module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck Pester;
-      Import-Module Pester;
-      $configuration = [PesterConfiguration]::Default;
-      $configuration.CodeCoverage.Enabled = $true;
-      $configuration.CodeCoverage.Path = (Get-ChildItem src/*.ps1 | ForEach-Object{$_.FullName});
-      $configuration.CodeCoverage.OutputFormat = "JaCoCo";
-      $configuration.TestResult.Enabled = $true;
-      $configuration.Run.Exit = $true;
-      $configuration.Run.Path = (Get-ChildItem tests/*ps1 | ForEach-Object{$_.FullName});
-      Invoke-Pester -Configuration $configuration;
-    showWarnings: true
-    pwsh: true
-- task: PowerShell@2
-  displayName: "Build the powershell package"
-  inputs:
-    filePath: 'build/build.ps1'
-    showWarnings: true
-    pwsh: true
-- task: PowerShell@2
-  displayName: "Debug files"
-  inputs:
-    targetType: 'inline'
-    script: |
-      ls -Recurse | select FullName;
-    showWarnings: true
-    pwsh: true
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: 'src/bin/'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
-- task: PublishTestResults@2
-  inputs:
-    testResultsFormat: 'NUnit'
-    testResultsFiles: 'testResults.xml'
-    failTaskOnFailedTests: true
-    testRunTitle: 'CZ.PowerShell.NetworkTools'
-- task: PublishCodeCoverageResults@1
-  inputs:
-    codeCoverageTool: 'JaCoCo'
-    summaryFileLocation: 'coverage.xml'
-    pathToSources: 'src/'
-    failIfCoverageEmpty: true
+jobs:
+  - job: 'tests'
+    strategy:
+      matrix:
+        linux:
+          imageName: 'ubuntu-latest'
+        mac:
+          imageName: 'macOS-latest'
+        windows:
+          imageName: 'windows-latest'
+    pool:
+      vmImage: $(imageName)
+    steps:
+      - task: PowerShell@2
+        displayName: "Run pester tests"
+        inputs:
+          targetType: 'inline'
+          script: |
+            Install-Module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck Pester;
+            Import-Module Pester;
+            $configuration = [PesterConfiguration]::Default;
+            $configuration.CodeCoverage.Enabled = $true;
+            $configuration.CodeCoverage.Path = (Get-ChildItem src/*.ps1 | ForEach-Object{$_.FullName});
+            $configuration.CodeCoverage.OutputFormat = "JaCoCo";
+            $configuration.CodeCoverage.OutputPath = '$(imageName)-coverage.xml'
+            $configuration.TestResult.Enabled = $true;
+            $configuration.TestResult.OutputPath = '$(imageName)-testResults.xml'
+            $configuration.Run.Exit = $true;
+            $configuration.Run.Path = (Get-ChildItem tests/*ps1 | ForEach-Object{$_.FullName});
+            Invoke-Pester -Configuration $configuration;
+          showWarnings: true
+          pwsh: true
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Coverage'
+        condition: always()
+        inputs:
+            PathtoPublish: '$(imageName)-coverage.xml'
+            ArtifactName: 'coverage'
+            publishLocation: Container
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Tests'
+        condition: always()
+        inputs:
+            PathtoPublish: '$(imageName)-testResults.xml'
+            ArtifactName: 'tests'
+            publishLocation: Container
+  - job: 'build_package'
+    pool:
+      vmImage: windows-latest
+    dependsOn:
+      - 'tests'
+    steps:
+      - task: PowerShell@2
+        displayName: "Build the powershell package"
+        inputs:
+          filePath: 'build/build.ps1'
+          showWarnings: true
+          pwsh: true
+      - task: PublishBuildArtifacts@1
+        inputs:
+            PathtoPublish: 'src/bin/'
+            ArtifactName: 'drop'
+            publishLocation: 'Container'
+  - job: 'publish_coverage_and_tests'
+    pool:
+      vmImage: windows-latest
+    dependsOn:
+      - 'tests'
+    steps:
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Coverage Windows Artifacts'
+      #   inputs:
+      #     artifactName: windows-coverage
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Coverage Linux Artifacts'
+      #   inputs:
+      #     artifactName: linux-coverage
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Tests Windows Artifacts'
+      #   inputs:
+      #     artifactName: windows-tests
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      # - task: DownloadBuildArtifacts@0
+      #   displayName: 'Download Tests Linux Artifacts'
+      #   inputs:
+      #     artifactName: linux-tests
+      #     downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@1
+        displayName: 'Download All Tests Artifacts'
+        inputs:
+          artifactName: 'tests'
+          downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: DownloadBuildArtifacts@1
+        displayName: 'Download All Coverage Artifacts'
+        inputs:
+          artifactName: 'coverage'
+          downloadPath: $(System.DefaultWorkingDirectory)/
+      - task: PublishCodeCoverageResults@1
+        condition: always()
+        inputs:
+          codeCoverageTool: 'JaCoCo'
+          summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage/*coverage.xml'
+          pathToSources: 'src/'
+          failIfCoverageEmpty: true
+      - task: PublishTestResults@2
+        condition: always()
+        inputs:
+          testResultsFormat: 'NUnit'
+          testResultsFiles: '$(System.DefaultWorkingDirectory)/tests/*testResults.xml'
+          failTaskOnFailedTests: true
+          testRunTitle: 'CZ.PowerShell.NetworkTools'
+          mergeTestResults: true

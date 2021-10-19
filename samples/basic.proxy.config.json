@@ -1,0 +1,6 @@
+{
+    "ProxyAddress": "http://proxy.codez.one:80",
+    "BypassList": [
+        "git.codez.one"
+    ]
+}
